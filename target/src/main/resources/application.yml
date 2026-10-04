@@ -1,0 +1,37 @@
+server:
+  port: 8080
+  shutdown: immediate
+spring:
+  application:
+    name: target
+  threads:
+    virtual:
+      enabled: true
+  main:
+    banner-mode: off
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      minimum-expected-value:
+        http.server.requests: 1ms
+      maximum-expected-value:
+        http.server.requests: 5s
+    tags:
+      cj_scope: ${CJ_SCOPE:local}
+      role: ${CJ_ROLE:none}
+      lane: ${CJ_LANE:none}
+      trial: ${CJ_TRIAL:none}
+  observations:
+    http:
+      server:
+        requests:
+          name: http.server.requests
+logging:
+  level:
+    root: warn

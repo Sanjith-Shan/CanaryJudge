@@ -1,0 +1,15 @@
+.gradle/
+build/
+*.class
+.idea/
+*.iml
+.DS_Store
+*.log
+__pycache__/
+.venv/
+*.hprof
+.minipc-busy
+.minipc-runs/
+BUILD_BRIEF.md
+.work/
+run/

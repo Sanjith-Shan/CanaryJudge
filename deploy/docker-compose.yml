@@ -1,0 +1,51 @@
+# The canary stack: Prometheus, the traffic splitter and the load generator. Target containers (baseline and
+# canary per lane) are started and removed by the trial runner and the rollout controller on the cj-net network.
+# Host ports are in the 1xxxx range to stay clear of other projects on the same machine.
+name: canaryjudge
+
+networks:
+  default:
+    name: cj-net
+
+volumes:
+  cj-prom-data: {}
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    container_name: cj-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=90d
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - cj-prom-data:/prometheus
+    ports: ["19090:9090"]
+    mem_limit: 600m
+    labels: { project: canaryjudge }
+
+  splitter:
+    image: canaryjudge:dev
+    container_name: cj-splitter
+    command: ["java", "-Xmx160m", "-XX:+UseSerialGC", "-jar", "/app/traffic.jar", "splitter", "--port", "8000",
+              "--lanes", "l1:0.5:0.5:request,l2:0.5:0.5:request,l3:0.5:0.5:request,r1:0:0"]
+    ports: ["18000:8000"]
+    mem_limit: 320m
+    labels: { project: canaryjudge }
+
+  loadgen:
+    image: canaryjudge:dev
+    container_name: cj-loadgen
+    command: ["java", "-Xmx160m", "-XX:+UseSerialGC", "-jar", "/app/traffic.jar", "loadgen",
+              "--target", "http://cj-splitter:8000", "--control-port", "8001", "--users", "50000", "--seed", "20261004"]
+    environment:
+      TRACE: ${TRACE:-}
+      TRACE_STEP_S: ${TRACE_STEP_S:-10}
+    volumes:
+      - ../configs:/configs:ro
+    ports: ["18001:8001"]
+    mem_limit: 320m
+    depends_on: [splitter]
+    labels: { project: canaryjudge }

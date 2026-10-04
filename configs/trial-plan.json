@@ -1,0 +1,26 @@
+{
+  "prefix": "t",
+  "seed": 20261004,
+  "laneRps": 80,
+  "warmupSeconds": 60,
+  "windowSeconds": 360,
+  "stepSeconds": 10,
+  "laneStaggerSeconds": 40,
+  "heap": "256m",
+  "memLimit": "420m",
+  "conditions": [
+    { "scenario": "calibration", "type": "none", "size": 0, "repeats": 6 },
+    { "scenario": "aa", "type": "none", "size": 0, "repeats": 30 },
+    { "scenario": "latency_2", "type": "latency", "size": 0.02, "repeats": 8 },
+    { "scenario": "latency_5", "type": "latency", "size": 0.05, "repeats": 8 },
+    { "scenario": "latency_10", "type": "latency", "size": 0.10, "repeats": 8 },
+    { "scenario": "latency_25", "type": "latency", "size": 0.25, "repeats": 8 },
+    { "scenario": "latency_50", "type": "latency", "size": 0.50, "repeats": 8 },
+    { "scenario": "errors_0.5", "type": "errors", "size": 0.005, "repeats": 8 },
+    { "scenario": "errors_2", "type": "errors", "size": 0.02, "repeats": 8 },
+    { "scenario": "leak_1k", "type": "leak", "size": 1024, "repeats": 6 },
+    { "scenario": "leak_4k", "type": "leak", "size": 4096, "repeats": 6 },
+    { "scenario": "cpu_1ms", "type": "cpu", "size": 1, "repeats": 6 },
+    { "scenario": "cpu_4ms", "type": "cpu", "size": 4, "repeats": 6 }
+  ]
+}

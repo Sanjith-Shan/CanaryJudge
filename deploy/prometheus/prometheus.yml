@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 2s
+  scrape_timeout: 2s
+  evaluation_interval: 10s
+
+scrape_configs:
+  # Target services: three trial lanes (baseline + canary each) and the rollout lane (primary, baseline, canary).
+  # Containers come and go between trials; a target that is down just fails its scrape. Every series carries
+  # cj_scope (trial and role), which is what canary queries select on.
+  - job_name: target
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - cj-l1-baseline:8080
+          - cj-l1-canary:8080
+          - cj-l2-baseline:8080
+          - cj-l2-canary:8080
+          - cj-l3-baseline:8080
+          - cj-l3-canary:8080
+          - cj-r1-primary:8080
+          - cj-r1-baseline:8080
+          - cj-r1-canary:8080
+  - job_name: splitter
+    static_configs:
+      - targets: ['cj-splitter:8000']
+  - job_name: canaryjudge
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['cj-server:8090']

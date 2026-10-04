@@ -1,0 +1,14 @@
+plugins { id 'application' }
+
+dependencies {
+    implementation project(':core')
+    testImplementation platform("org.junit:junit-bom:${junitVersion}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'io.canaryjudge.bench.Main'
+    applicationName = 'bench'
+    applicationDefaultJvmArgs = ['-Xmx768m']
+}

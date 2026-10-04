@@ -1,0 +1,13 @@
+{
+  "prefix": "smoke",
+  "seed": 1,
+  "laneRps": 80,
+  "warmupSeconds": 20,
+  "windowSeconds": 60,
+  "stepSeconds": 10,
+  "laneStaggerSeconds": 0,
+  "conditions": [
+    { "scenario": "aa", "type": "none", "size": 0, "repeats": 1 },
+    { "scenario": "latency_50", "type": "latency", "size": 0.5, "repeats": 1 }
+  ]
+}

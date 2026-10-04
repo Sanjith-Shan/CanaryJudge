@@ -1,0 +1,96 @@
+{
+  "id": "canaryjudge-target",
+  "name": "target service golden signals",
+  "description": "Latency, errors and saturation of the sample target service. Kayenta canary config format; the canaryjudge blocks hold the sequential judge's settings and are ignored by Kayenta.",
+  "applications": ["ad-hoc"],
+  "configVersion": "1",
+  "judge": { "name": "NetflixACAJudge-v1.0", "judgeConfigurations": {} },
+  "templates": {},
+  "classifier": { "groupWeights": { "Latency": 40, "Errors": 40, "Saturation": 20 } },
+  "metrics": [
+    {
+      "name": "latency_p50",
+      "groups": ["Latency"],
+      "scopeName": "default",
+      "query": {
+        "type": "prometheus",
+        "metricName": "http_server_requests_seconds_bucket",
+        "customInlineTemplate": "PromQL:histogram_quantile(0.5, sum by (le) (rate(http_server_requests_seconds_bucket{cj_scope=\"${scope}\",uri=\"/api/items/{id}\"}[10s])))"
+      },
+      "analysisConfigurations": {
+        "canary": { "direction": "increase", "nanStrategy": "remove" },
+        "canaryjudge": { "sequential": { "type": "mean", "logScale": true } }
+      }
+    },
+    {
+      "name": "latency_p90",
+      "groups": ["Latency"],
+      "scopeName": "default",
+      "query": {
+        "type": "prometheus",
+        "metricName": "http_server_requests_seconds_bucket",
+        "customInlineTemplate": "PromQL:histogram_quantile(0.9, sum by (le) (rate(http_server_requests_seconds_bucket{cj_scope=\"${scope}\",uri=\"/api/items/{id}\"}[10s])))"
+      },
+      "analysisConfigurations": {
+        "canary": { "direction": "increase", "nanStrategy": "remove" },
+        "canaryjudge": { "sequential": { "type": "mean", "logScale": true } }
+      }
+    },
+    {
+      "name": "latency_p99",
+      "groups": ["Latency"],
+      "scopeName": "default",
+      "query": {
+        "type": "prometheus",
+        "metricName": "http_server_requests_seconds_bucket",
+        "customInlineTemplate": "PromQL:histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{cj_scope=\"${scope}\",uri=\"/api/items/{id}\"}[10s])))"
+      },
+      "analysisConfigurations": {
+        "canary": { "direction": "increase", "nanStrategy": "remove" },
+        "canaryjudge": { "sequential": { "type": "mean", "logScale": true } }
+      }
+    },
+    {
+      "name": "error_rate",
+      "groups": ["Errors"],
+      "scopeName": "default",
+      "query": {
+        "type": "prometheus",
+        "metricName": "http_server_requests_seconds_count",
+        "customInlineTemplate": "PromQL:(sum(rate(http_server_requests_seconds_count{cj_scope=\"${scope}\",uri=\"/api/items/{id}\",status=~\"5..\"}[10s])) or vector(0)) / sum(rate(http_server_requests_seconds_count{cj_scope=\"${scope}\",uri=\"/api/items/{id}\"}[10s]))"
+      },
+      "analysisConfigurations": {
+        "canary": { "direction": "increase", "nanStrategy": "replace", "critical": true },
+        "canaryjudge": { "sequential": { "type": "rate", "countSeries": "errors_total", "totalSeries": "requests_total" } }
+      }
+    },
+    {
+      "name": "cpu",
+      "groups": ["Saturation"],
+      "scopeName": "default",
+      "query": {
+        "type": "prometheus",
+        "metricName": "process_cpu_usage",
+        "customInlineTemplate": "PromQL:avg(process_cpu_usage{cj_scope=\"${scope}\"})"
+      },
+      "analysisConfigurations": {
+        "canary": { "direction": "increase", "nanStrategy": "remove" },
+        "canaryjudge": { "sequential": { "type": "mean" } }
+      }
+    },
+    {
+      "name": "heap_used",
+      "groups": ["Saturation"],
+      "scopeName": "default",
+      "query": {
+        "type": "prometheus",
+        "metricName": "jvm_memory_used_bytes",
+        "customInlineTemplate": "PromQL:sum(jvm_memory_used_bytes{cj_scope=\"${scope}\",area=\"heap\"})"
+      },
+      "analysisConfigurations": {
+        "canary": { "direction": "increase", "nanStrategy": "remove" },
+        "canaryjudge": { "sequential": { "type": "mean" } }
+      }
+    }
+  ]
+}

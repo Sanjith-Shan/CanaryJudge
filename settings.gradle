@@ -1,0 +1,2 @@
+rootProject.name = 'canaryjudge'
+include 'core', 'target', 'traffic', 'bench'
