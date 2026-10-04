@@ -5,7 +5,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /** Describes the machine and its current load for every results row. */
 public final class Machine {
@@ -41,18 +40,19 @@ public final class Machine {
         return m;
     }
 
+    /**
+     * Windows host CPU %, read from the file scripts/host_cpu_sampler.ps1 keeps up to date (CJ_HOST_CPU_FILE);
+     * null when the file is missing or older than a minute. Starting powershell.exe from inside WSL for this, as
+     * an earlier version did, is the likely cause of the WSL service failures in BUG_LOG #9.
+     */
     static Double windowsCpu() {
+        String f = System.getenv("CJ_HOST_CPU_FILE");
+        if (f == null) return null;
         try {
-            Process p = new ProcessBuilder("powershell.exe", "-NoProfile", "-Command",
-                    "(Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average")
-                    .redirectErrorStream(true).start();
-            if (!p.waitFor(20, TimeUnit.SECONDS)) {
-                p.destroyForcibly();
-                return null;
-            }
-            String out = new String(p.getInputStream().readAllBytes()).trim();
-            return out.isEmpty() ? null : Double.parseDouble(out.lines().reduce((a, b) -> b).orElse("").trim());
-        } catch (Exception e) {
+            String[] p = Files.readString(Path.of(f)).trim().split("\\s+");
+            long age = System.currentTimeMillis() / 1000 - Long.parseLong(p[0]);
+            return age > 60 ? null : Double.parseDouble(p[1]);
+        } catch (IOException | RuntimeException e) {
             return null;
         }
     }

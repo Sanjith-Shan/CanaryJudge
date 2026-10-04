@@ -1,0 +1,52 @@
+name: kayenta-diff
+
+# exp4 on a GitHub runner: Kayenta (Spinnaker's image, unmodified) and CanaryJudge (through its Kayenta-compatible
+# API) judge every committed recording, each at 12, 24 and 36 intervals. The rows are uploaded as an artifact and
+# committed to results/exp4.jsonl by hand. Runs on demand and whenever the recordings change.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['results/trials.jsonl', 'configs/canary-config.json']
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build
+        run: ./gradlew --no-daemon -q :bench:installDist :server:bootJar
+      - name: Start Kayenta and Redis
+        run: |
+          docker network create cj-net
+          docker run -d --name cj-redis --network cj-net redis:7-alpine
+          docker run -d --name cj-kayenta --network cj-net -p 18091:8090 \
+            -e services.redis.baseUrl=redis://cj-redis:6379 -e PROMETHEUS_URL=http://localhost:9 \
+            -v "$PWD/deploy/kayenta/kayenta.yml:/opt/kayenta/config/kayenta.yml:ro" \
+            us-docker.pkg.dev/spinnaker-community/docker/kayenta:2026.0.4-slim
+          for i in $(seq 1 90); do docker logs cj-kayenta 2>&1 | grep -q "Started Main" && break; sleep 5; done
+          curl -s localhost:18091/health | head -c 300; echo
+      - name: Start CanaryJudge
+        run: |
+          java -jar server/build/libs/canaryjudge-server.jar --canaryjudge.config-dir=configs > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf localhost:8090/actuator/health > /dev/null && break; sleep 2; done
+      - name: Differential test
+        run: |
+          mkdir -p run
+          bench/build/install/bench/bin/bench kayenta-diff --trials results/trials.jsonl --out run/exp4.jsonl \
+            --canaryjudge http://localhost:8090 --kayenta http://localhost:18091
+          bench/build/install/bench/bin/bench kayenta-diff --trials results/trials.jsonl --out run/exp4_inprocess.jsonl \
+            --kayenta http://localhost:18091
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exp4
+          path: |
+            run/
+            server.log
