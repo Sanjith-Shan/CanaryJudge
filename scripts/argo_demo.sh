@@ -12,6 +12,7 @@ CLUSTER=cj-argo
 ARGO_INSTALL=${ARGO_INSTALL:-$HOME/canaryjudge-work/k8s/argo-rollouts-install.yaml}
 OUT=docs/argo
 mkdir -p "$OUT" results
+if [ "${GITHUB_ACTIONS:-}" = true ]; then MACHINE="GitHub Actions runner ($(nproc) vCPU), k3d single-node cluster"; else MACHINE="mini PC (Ryzen 3 4300U), k3d single-node cluster in WSL2"; fi
 k() { kubectl --context "k3d-$CLUSTER" "$@"; }
 ts() { date -Iseconds; }
 
@@ -65,8 +66,8 @@ update() { # name inject_type inject_size expected
   if [ "$aborted" = true ]; then outcome="aborted after ${secs}s (${measurements}; last verdict ${last})";
   else outcome="promoted after ${secs}s, phase ${phase} (${measurements}; last verdict ${last})"; fi
   echo "$name: $outcome"
-  printf '{"exp":"argo","ts":"%s","update":"%s","inject_type":"%s","inject_size":%s,"aborted":%s,"seconds":%d,"analysis":"%s","last_verdict":"%s","description":"Argo Rollouts %s update (%s %s), experiment with a fresh baseline and canary judged by CanaryJudge every 10 s","outcome":"%s","machine":"mini PC (Ryzen 3 4300U), k3d single-node cluster in WSL2 (2 vCPU)"}\n' \
-    "$(ts)" "$name" "$type" "$size" "${aborted:-false}" "$secs" "$measurements" "$last" "$name" "$type" "$size" "$outcome" >> results/argo.jsonl
+  printf '{"exp":"argo","ts":"%s","update":"%s","inject_type":"%s","inject_size":%s,"aborted":%s,"seconds":%d,"analysis":"%s","last_verdict":"%s","description":"Argo Rollouts %s update (%s %s), experiment with a fresh baseline and canary judged by CanaryJudge every 10 s","outcome":"%s","machine":"%s"}\n' \
+    "$(ts)" "$name" "$type" "$size" "${aborted:-false}" "$secs" "$measurements" "$last" "$name" "$type" "$size" "$outcome" "$MACHINE" >> results/argo.jsonl
   k get "$ar" -o yaml > "$OUT/$name-analysisrun.yaml"
 }
 
