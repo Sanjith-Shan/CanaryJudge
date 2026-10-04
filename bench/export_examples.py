@@ -8,7 +8,7 @@ import math
 import pathlib
 import sys
 
-COLUMNS = ["latency_p50", "latency_p90", "latency_p99", "error_rate", "cpu", "heap_after_gc",
+COLUMNS = ["latency_p50", "latency_p90", "latency_p99", "error_rate", "cpu", "heap_growth",
            "errors_total", "requests_total"]
 
 

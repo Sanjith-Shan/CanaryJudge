@@ -19,6 +19,7 @@ jobs:
       - name: Build; unit, golden (scipy) and property tests; Kayenta differential test in Testcontainers
         run: ./gradlew build --no-daemon
       - name: Replay the recorded runs through every judge (exp1 to exp3, from the committed recordings)
+        if: hashFiles('results/trials.jsonl') != ''
         run: |
           ./gradlew --no-daemon -q :bench:installDist
           mkdir -p run

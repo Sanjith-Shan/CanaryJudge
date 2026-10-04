@@ -54,7 +54,7 @@ class KayentaApiTest {
                 MetricSetPair.of("latency_p99", series(5, 0.070, 0.005), series(6, 0.070, 0.005), 0, 10_000),
                 MetricSetPair.of("error_rate", new double[36], new double[36], 0, 10_000),
                 MetricSetPair.of("cpu", series(7, 0.05, 0.01), series(8, 0.05, 0.01), 0, 10_000),
-                MetricSetPair.of("heap_after_gc", series(9, 4e7, 1e6), series(10, 4e7, 1e6), 0, 10_000));
+                MetricSetPair.of("heap_growth", series(9, 2e4, 1e4), series(10, 2e4, 1e4), 0, 10_000));
         String listId = postJson("/metricSetPairList", json.writeValueAsString(pairs)).get("metricSetPairListId").asText();
         JsonNode result = postJson("/judges/judge?canaryConfigId=" + configId + "&metricSetPairListId=" + listId
                 + "&passThreshold=95&marginalThreshold=75", "");
