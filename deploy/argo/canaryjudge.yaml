@@ -1,0 +1,39 @@
+# The CanaryJudge server inside the cluster, reading the canary config from a ConfigMap
+# (created from configs/ by scripts/argo_demo.sh) and metrics from the in-cluster Prometheus.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canaryjudge
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: canaryjudge } }
+  template:
+    metadata:
+      labels: { app: canaryjudge }
+    spec:
+      containers:
+        - name: canaryjudge
+          image: canaryjudge:dev
+          imagePullPolicy: Never
+          command: ["java", "-Xmx256m", "-XX:+UseSerialGC", "-jar", "/app/canaryjudge-server.jar"]
+          env:
+            - { name: PROMETHEUS_URL, value: "http://prometheus:9090" }
+            - { name: CONFIG_DIR, value: /configs }
+            - { name: SPLITTER_URL, value: "http://unused:8000" }
+          ports: [{ containerPort: 8090 }]
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 8090 }
+            periodSeconds: 5
+          resources: { limits: { memory: 450Mi } }
+          volumeMounts: [{ name: configs, mountPath: /configs }]
+      volumes:
+        - name: configs
+          configMap: { name: canaryjudge-configs }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: canaryjudge
+spec:
+  selector: { app: canaryjudge }
+  ports: [{ port: 8090, targetPort: 8090 }]

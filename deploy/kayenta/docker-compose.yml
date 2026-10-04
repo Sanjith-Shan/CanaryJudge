@@ -1,0 +1,29 @@
+# Kayenta (the reference judge) and the Redis its embedded Orca needs. Joins the canary stack's network so it
+# can reach Prometheus for live /canary runs. Started only for the differential test.
+name: canaryjudge-kayenta
+
+networks:
+  default:
+    name: cj-net
+    external: true
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: cj-redis
+    mem_limit: 128m
+    labels: { project: canaryjudge }
+
+  kayenta:
+    image: us-docker.pkg.dev/spinnaker-community/docker/kayenta:2026.0.4-slim
+    container_name: cj-kayenta
+    environment:
+      services.redis.baseUrl: redis://cj-redis:6379
+      JAVA_OPTS: -Xmx700m
+    volumes:
+      - ./kayenta.yml:/opt/kayenta/config/kayenta.yml:ro
+    ports: ["18091:8090"]
+    mem_limit: 1100m
+    cpus: ${KAYENTA_CPUS:-2}
+    depends_on: [redis]
+    labels: { project: canaryjudge }

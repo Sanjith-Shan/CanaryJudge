@@ -1,0 +1,57 @@
+# Kayenta, run unmodified from the Spinnaker community image, as the reference for the differential test.
+# In-memory storage for configs and metric set pairs; Prometheus for live /canary runs.
+server:
+  port: 8090
+
+redis:
+  connection: ${services.redis.baseUrl:redis://cj-redis:6379}
+
+kayenta:
+  atlas: { enabled: false }
+  google: { enabled: false }
+  aws: { enabled: false }
+  azure: { enabled: false }
+  datadog: { enabled: false }
+  graphite: { enabled: false }
+  newrelic: { enabled: false }
+  signalfx: { enabled: false }
+  wavefront: { enabled: false }
+  gcs: { enabled: false }
+  blobs: { enabled: false }
+  s3: { enabled: false }
+  stackdriver: { enabled: false }
+  configbin: { enabled: false }
+  remoteJudge: { enabled: false }
+  standaloneCanaryAnalysis: { enabled: false }
+  prometheus:
+    enabled: true
+    accounts:
+      - name: prometheus
+        endpoint:
+          baseUrl: ${PROMETHEUS_URL:http://cj-prometheus:9090}
+        supportedTypes:
+          - METRICS_STORE
+  memory:
+    enabled: true
+    accounts:
+      - name: in-memory-store
+        supportedTypes:
+          - OBJECT_STORE
+          - CONFIGURATION_STORE
+  serialization:
+    writeDatesAsTimestamps: false
+    writeDurationsAsTimestamps: false
+
+keiko:
+  queue:
+    redis:
+      queueName: kayenta.keiko.queue
+      deadLetterQueueName: kayenta.keiko.queue.deadLetters
+
+management.endpoints.web.exposure.include: health,info
+
+spring:
+  autoconfigure:
+    exclude: >
+      org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,
+      org.springframework.boot.autoconfigure.liquibase.LiquibaseAutoConfiguration

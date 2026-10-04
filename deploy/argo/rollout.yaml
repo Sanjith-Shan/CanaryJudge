@@ -1,0 +1,81 @@
+# The target service as an Argo Rollout. Each update first runs an experiment: a fresh baseline (the stable pod
+# spec) and a fresh canary (the new spec) start together with one pod each and take traffic beside the stable
+# pods, while the canaryjudge analysis watches them. Only if the analysis does not fail does the rollout shift
+# weight to the canary. Every pod labels its metrics with its pod-template hash (cj_scope), which is how the
+# analysis tells baseline from canary.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: target
+spec:
+  replicas: 3
+  revisionHistoryLimit: 2
+  selector: { matchLabels: { app: target } }
+  strategy:
+    canary:
+      steps:
+        - experiment:
+            duration: 4m
+            templates:
+              - { name: baseline, specRef: stable, replicas: 1 }
+              - { name: canary, specRef: canary, replicas: 1 }
+            analyses:
+              - name: canaryjudge
+                templateName: canaryjudge
+                args:
+                  - { name: baseline-hash, value: "{{templates.baseline.podTemplateHash}}" }
+                  - { name: canary-hash, value: "{{templates.canary.podTemplateHash}}" }
+        - setWeight: 50
+        - pause: { duration: 30s }
+  template:
+    metadata:
+      labels: { app: target }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: target
+          image: canaryjudge:dev
+          imagePullPolicy: Never
+          command: ["java", "-Xmx200m", "-XX:+UseSerialGC", "-jar", "/app/target-service.jar"]
+          env:
+            - name: CJ_SCOPE
+              valueFrom: { fieldRef: { fieldPath: "metadata.labels['rollouts-pod-template-hash']" } }
+            - { name: CJ_ROLE, value: pod }
+            - { name: CJ_LANE, value: k8s }
+            - { name: INJECT_TYPE, value: none }
+            - { name: INJECT_SIZE, value: "0" }
+          ports: [{ containerPort: 8080 }]
+          readinessProbe:
+            httpGet: { path: /actuator/health, port: 8080 }
+            periodSeconds: 3
+          resources: { limits: { memory: 380Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: target
+spec:
+  selector: { app: target }
+  ports: [{ port: 8080, targetPort: 8080 }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: loadgen } }
+  template:
+    metadata:
+      labels: { app: loadgen }
+    spec:
+      containers:
+        - name: loadgen
+          image: canaryjudge:dev
+          imagePullPolicy: Never
+          command: ["java", "-Xmx160m", "-XX:+UseSerialGC", "-jar", "/app/traffic.jar", "loadgen",
+                    "--target", "http://target:8080", "--lanes", "direct:150", "--no-lane-prefix", "true"]
+          resources: { limits: { memory: 300Mi } }

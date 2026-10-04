@@ -1,0 +1,22 @@
+# Argo Rollouts asks CanaryJudge every 10 s whether the canary is worse than its baseline. The sequential judge
+# keeps its false-alarm rate at 5% however often it is asked, so a failure aborts the rollout at once
+# (failureLimit 0). "pending" (still warming up) and "pass" both count as success.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: canaryjudge
+spec:
+  args:
+    - name: baseline-hash
+    - name: canary-hash
+  metrics:
+    - name: canaryjudge
+      interval: 10s
+      failureLimit: 0
+      consecutiveErrorLimit: 6
+      successCondition: result != "fail"
+      provider:
+        web:
+          url: "http://canaryjudge.default.svc.cluster.local:8090/api/v1/judge?baseline={{args.baseline-hash}}&canary={{args.canary-hash}}&mode=sequential&warmup=30"
+          timeoutSeconds: 20
+          jsonPath: "{$.verdict}"

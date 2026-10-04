@@ -29,23 +29,42 @@ services:
   splitter:
     image: canaryjudge:dev
     container_name: cj-splitter
-    command: ["java", "-Xmx160m", "-XX:+UseSerialGC", "-jar", "/app/traffic.jar", "splitter", "--port", "8000",
-              "--lanes", "l1:0.5:0.5:request,l2:0.5:0.5:request,l3:0.5:0.5:request,r1:0:0"]
+    command: ["java", "-Xmx256m", "-XX:+UseSerialGC", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/traffic.jar", "splitter", "--port", "8000",
+              "--lanes", "l1:0.5:0.5:request,l2:0.5:0.5:request,l3:0.5:0.5:request,r1:0:0,r2:0:0"]
     ports: ["18000:8000"]
-    mem_limit: 320m
+    mem_limit: 420m
+    restart: unless-stopped
     labels: { project: canaryjudge }
 
   loadgen:
     image: canaryjudge:dev
     container_name: cj-loadgen
-    command: ["java", "-Xmx160m", "-XX:+UseSerialGC", "-jar", "/app/traffic.jar", "loadgen",
+    command: ["java", "-Xmx256m", "-XX:+UseSerialGC", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/traffic.jar", "loadgen",
               "--target", "http://cj-splitter:8000", "--control-port", "8001", "--users", "50000", "--seed", "20261004"]
     environment:
       TRACE: ${TRACE:-}
       TRACE_STEP_S: ${TRACE_STEP_S:-10}
+      TRACE_OFFSET: ${TRACE_OFFSET:-0}
     volumes:
       - ../configs:/configs:ro
     ports: ["18001:8001"]
-    mem_limit: 320m
+    mem_limit: 420m
+    restart: unless-stopped
     depends_on: [splitter]
+    labels: { project: canaryjudge }
+
+  server:
+    image: canaryjudge:dev
+    container_name: cj-server
+    command: ["java", "-Xmx256m", "-XX:+UseSerialGC", "-jar", "/app/canaryjudge-server.jar"]
+    environment:
+      PROMETHEUS_URL: http://cj-prometheus:9090
+      SPLITTER_URL: http://cj-splitter:8000
+      CONFIG_DIR: /configs
+    volumes:
+      - ../configs:/configs:ro
+    ports: ["18090:8090"]
+    mem_limit: 450m
+    restart: unless-stopped
+    depends_on: [prometheus, splitter]
     labels: { project: canaryjudge }

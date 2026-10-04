@@ -31,10 +31,12 @@ public record AnalysisSettings(
 
     /**
      * How the sequential judge treats this metric. {@code mean} tests paired per-interval values with a
-     * mixture SPRT; {@code rate} tests event counts against request counts with a rate-ratio e-process,
-     * reading the cumulative counters named by {@code countSeries} and {@code totalSeries}.
+     * sequential t-test; {@code rate} tests event counts against request counts with a rate-ratio e-process,
+     * reading the cumulative counters named by {@code countSeries} and {@code totalSeries}. {@code margin} is a
+     * shift the canary may have before it counts as harm (a ratio for log-scale metrics, so 1.25 tolerates +25%,
+     * matching an {@code effectSize.allowedIncrease} of 1.25); the test then asks whether the shift exceeds it.
      */
-    public record Sequential(String type, String countSeries, String totalSeries, boolean logScale) {}
+    public record Sequential(String type, String countSeries, String totalSeries, boolean logScale, double margin) {}
 
     public static AnalysisSettings from(JsonNode analysisConfigurations) {
         JsonNode c = analysisConfigurations == null ? null : analysisConfigurations.get("canary");
@@ -53,7 +55,8 @@ public record AnalysisSettings(
                 text(cj, "mean", "sequential", "type"),
                 text(cj, null, "sequential", "countSeries"),
                 text(cj, null, "sequential", "totalSeries"),
-                bool(cj, false, "sequential", "logScale"));
+                bool(cj, false, "sequential", "logScale"),
+                number(cj, 0.0, "sequential", "margin"));
         return new AnalysisSettings(direction, nan, removeOutliers, outlierFactor,
                 bool(c, false, "critical"), bool(c, false, "mustHaveData"), bool(c, false, "muted"),
                 measure,

@@ -40,7 +40,7 @@ public final class Docker {
             cmd.add("-e");
             cmd.add(e.getKey() + "=" + e.getValue());
         }
-        cmd.addAll(List.of(image, "java", "-Xmx" + heap, "-XX:+UseSerialGC", "-Xss512k", "-jar", "/app/target-service.jar"));
+        cmd.addAll(List.of(image, "java", "-Xmx" + heap, "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-XX:MaxMetaspaceSize=128m", "-Xss256k", "-jar", "/app/target-service.jar"));
         return exec(cmd, 120);
     }
 }

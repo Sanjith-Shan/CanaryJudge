@@ -36,7 +36,10 @@ import java.util.concurrent.locks.LockSupport;
  * {@code GET /stats} reports sent, failed and in-flight counts.
  */
 public final class LoadGen {
+    static final int MAX_IN_FLIGHT_PER_LANE = 1000;
     private final String target;
+    /** False when the target is a service, not the splitter: then requests go to /api/... without the lane. */
+    volatile boolean lanePrefix = true;
     private final HttpClient client;
     private final double[] zipfCdf;
     private final double[] trace;
@@ -48,7 +51,7 @@ public final class LoadGen {
     final class LaneLoad implements Runnable {
         final String name;
         volatile double rps;
-        final LongAdder sent = new LongAdder(), failed = new LongAdder(), inFlight = new LongAdder();
+        final LongAdder sent = new LongAdder(), failed = new LongAdder(), inFlight = new LongAdder(), dropped = new LongAdder();
         final SplittableRandom rnd;
         volatile boolean stopped;
 
@@ -75,6 +78,10 @@ public final class LoadGen {
                 long wait = next - System.nanoTime();
                 if (wait > 0) LockSupport.parkNanos(wait);
                 else if (wait < -1_000_000_000L) next = System.nanoTime(); // fell behind by > 1 s: do not burst
+                if (inFlight.sum() >= MAX_IN_FLIGHT_PER_LANE) {
+                    dropped.increment(); // the splitter is stuck: drop rather than pile up requests
+                    continue;
+                }
                 Thread.startVirtualThread(() -> send(user, item));
             }
         }
@@ -82,8 +89,8 @@ public final class LoadGen {
         void send(long user, long item) {
             inFlight.increment();
             try {
-                URI uri = URI.create(target + "/" + name + "/api/items/" + item + "?user=" + user);
-                HttpResponse<Void> r = client.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).GET().build(),
+                URI uri = URI.create(target + (lanePrefix ? "/" + name : "") + "/api/items/" + item + "?user=" + user);
+                HttpResponse<Void> r = client.send(HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(5)).GET().build(),
                         HttpResponse.BodyHandlers.discarding());
                 if (r.statusCode() >= 500) failed.increment();
             } catch (IOException | InterruptedException e) {
@@ -103,7 +110,7 @@ public final class LoadGen {
         this.zipfCdf = zipfCdf(users, zipfS);
         this.client = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(2))
+                .connectTimeout(Duration.ofSeconds(1))
                 .executor(Executors.newVirtualThreadPerTaskExecutor())
                 .build();
     }
@@ -133,9 +140,12 @@ public final class LoadGen {
     double traceMultiplier() {
         if (trace == null || trace.length == 0) return 1.0;
         double t = (System.nanoTime() - startNanos) / 1e9;
-        int i = (int) (t / traceStepSeconds) % trace.length;
+        int i = (int) ((traceOffset + (long) (t / traceStepSeconds)) % trace.length);
         return trace[i];
     }
+
+    /** Index of the trace step to start from (for example a busy hour rather than midnight). */
+    volatile long traceOffset;
 
     void setLane(String name, double rps) {
         LaneLoad l = lanes.get(name);
@@ -154,7 +164,11 @@ public final class LoadGen {
             line = line.trim();
             if (line.isEmpty() || line.startsWith("#")) continue;
             String[] f = line.split(",");
-            v.add(Double.parseDouble(f[f.length - 1]));
+            try {
+                v.add(Double.parseDouble(f[f.length - 1]));
+            } catch (NumberFormatException header) {
+                // a CSV header line
+            }
         }
         return v.stream().mapToDouble(Double::doubleValue).toArray();
     }
@@ -164,6 +178,8 @@ public final class LoadGen {
         double[] trace = tracePath.isBlank() ? null : readTrace(tracePath);
         LoadGen g = new LoadGen(a.get("target", "http://localhost:8000"), a.getInt("users", 50_000),
                 a.getDouble("zipf", 1.0), trace, a.getDouble("trace-step-s", 10), a.getLong("seed", 1));
+        g.lanePrefix = !Boolean.parseBoolean(a.get("no-lane-prefix", "false"));
+        g.traceOffset = a.getLong("trace-offset", 0);
         for (String spec : a.get("lanes", "").split(",")) {
             if (spec.isBlank()) continue;
             String[] p = spec.split(":");
@@ -214,7 +230,8 @@ public final class LoadGen {
             sb.append('"').append(l.name).append("\":{\"rps\":").append(l.rps)
                     .append(",\"sent\":").append(l.sent.sum())
                     .append(",\"failed\":").append(l.failed.sum())
-                    .append(",\"inFlight\":").append(l.inFlight.sum()).append('}');
+                    .append(",\"inFlight\":").append(l.inFlight.sum())
+                    .append(",\"dropped\":").append(l.dropped.sum()).append('}');
         }
         return sb.append(first ? "" : ",").append("\"traceMultiplier\":").append(traceMultiplier()).append('}').toString();
     }

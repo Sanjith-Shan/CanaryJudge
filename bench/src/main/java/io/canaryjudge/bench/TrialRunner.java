@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.canaryjudge.core.config.CanaryConfig;
 import io.canaryjudge.core.model.Recording;
+import io.canaryjudge.core.prom.PromClient;
 
 import java.io.IOException;
 import java.net.URI;
@@ -49,6 +50,7 @@ public final class TrialRunner {
     private final Path out;
     private final double maxHostCpu;
     private final HttpClient http = HttpClient.newHttpClient();
+    private final Map<String, Integer> attempts = new java.util.concurrent.ConcurrentHashMap<>();
 
     TrialRunner(JsonNode plan, CanaryConfig config, Map<String, String> extra, PromClient prom, Docker docker,
                 String loadgen, Path out, double maxHostCpu) {
@@ -111,24 +113,75 @@ public final class TrialRunner {
             queued++;
         }
         System.out.printf("%d trials to run (%d already done) on lanes %s%n", queue.size(), done.size(), lanes);
-        double rps = plan.path("laneRps").asDouble(80);
-        for (String lane : lanes) post(loadgen + "/rate?lane=" + lane + "&rps=" + rps);
-        List<Thread> threads = new ArrayList<>();
-        int k = 0;
-        for (String lane : lanes) {
-            final int delay = k++ * plan.path("laneStaggerSeconds").asInt(20);
-            threads.add(Thread.ofPlatform().name("lane-" + lane).start(() -> {
+        // Lanes run in lockstep batches: every lane's pair starts at the same moment, all warm up together and all
+        // are measured over the same window. Staggered lanes were tried first: each lane's JVM start-up then
+        // saturated the two vCPUs during the other lanes' measurement windows (BUG_LOG #4).
+        while (!queue.isEmpty()) {
+            waitForQuietHost();
+            List<Started> batch = new ArrayList<>();
+            for (String lane : lanes) {
+                Trial t = queue.poll();
+                if (t == null) break;
+                batch.add(new Started(lane, t));
+            }
+            List<Thread> starters = new ArrayList<>();
+            for (Started s : batch) starters.add(Thread.ofVirtual().start(() -> run(() -> start(s))));
+            for (Thread th : starters) th.join();
+            long step = plan.path("stepSeconds").asLong(10);
+            long warmup = plan.path("warmupSeconds").asLong(90);
+            long window = plan.path("windowSeconds").asLong(360);
+            List<Started> ok = new ArrayList<>();
+            for (Started s : batch) {
                 try {
-                    Thread.sleep(delay * 1000L);
-                    Trial t;
-                    while ((t = queue.poll()) != null) runOne(lane, t);
-                } catch (Exception e) {
-                    e.printStackTrace();
+                    s.bReady = waitScraped(s.bScope());
+                    s.cReady = waitScraped(s.cScope());
+                    ok.add(s);
+                } catch (IOException e) {
+                    System.out.printf("[%s] %s did not start: %s%n", s.lane, s.trial.id(), e.getMessage());
+                    requeue(queue, s.trial);
                 }
-            }));
+            }
+            long ready = ok.stream().mapToLong(s -> Math.max(s.bReady, s.cReady)).max().orElse(System.currentTimeMillis());
+            long startSec = ((ready / 1000 + warmup) / step + 1) * step; // first point covers (start - step, start]
+            long endSec = startSec + window - step;
+            for (Started s : ok)
+                System.out.printf("[%s] %s %s %s size=%s: ready after %ds (skew %ds), window %d..%d%n", s.lane, s.trial.id(),
+                        s.trial.condition().scenario(), s.trial.condition().type(), s.trial.condition().size(),
+                        (Math.max(s.bReady, s.cReady) - s.launch) / 1000, Math.abs(s.bReady - s.cReady) / 1000, startSec, endSec);
+            sleepUntil((endSec + 4) * 1000);
+            for (Started s : ok) if (!finish(s, startSec, endSec, step, warmup)) requeue(queue, s.trial);
+            for (Started s : batch) {
+                post(loadgen + "/rate?lane=" + s.lane + "&rps=0");
+                docker.remove(s.bName());
+                docker.remove(s.cName());
+            }
         }
-        for (Thread t : threads) t.join();
-        for (String lane : lanes) post(loadgen + "/rate?lane=" + lane + "&rps=0");
+    }
+
+    private void requeue(ConcurrentLinkedQueue<Trial> queue, Trial t) {
+        int n = attempts.merge(t.id(), 1, Integer::sum);
+        if (n < 3) queue.add(t);
+    }
+
+    /** A trial whose two containers have been launched. */
+    static final class Started {
+        final String lane;
+        final Trial trial;
+        long launch, bReady, cReady;
+        Map<String, Object> loadBefore;
+
+        Started(String lane, Trial trial) {
+            this.lane = lane;
+            this.trial = trial;
+        }
+
+        String bName() { return "cj-" + lane + "-baseline"; }
+
+        String cName() { return "cj-" + lane + "-canary"; }
+
+        String bScope() { return trial.id() + "-baseline"; }
+
+        String cScope() { return trial.id() + "-canary"; }
     }
 
     void waitForQuietHost() throws InterruptedException {
@@ -140,40 +193,37 @@ public final class TrialRunner {
         }
     }
 
-    void runOne(String lane, Trial t) throws Exception {
-        waitForQuietHost();
-        Map<String, Object> loadBefore = Machine.load();
-        String bName = "cj-" + lane + "-baseline", cName = "cj-" + lane + "-canary";
-        String bScope = t.id() + "-baseline", cScope = t.id() + "-canary";
-        docker.remove(bName);
-        docker.remove(cName);
-        Map<String, String> common = Map.of("CJ_LANE", lane, "CJ_TRIAL", t.id());
+    /** Launches a trial's baseline and canary at the same moment and turns its lane's traffic on. */
+    void start(Started s) throws Exception {
+        Trial t = s.trial;
+        s.loadBefore = Machine.load();
+        docker.remove(s.bName());
+        docker.remove(s.cName());
+        Map<String, String> common = Map.of("CJ_LANE", s.lane, "CJ_TRIAL", t.id());
         Map<String, String> bEnv = new LinkedHashMap<>(common);
-        bEnv.put("CJ_SCOPE", bScope);
+        bEnv.put("CJ_SCOPE", s.bScope());
         bEnv.put("CJ_ROLE", "baseline");
         Map<String, String> cEnv = new LinkedHashMap<>(common);
-        cEnv.put("CJ_SCOPE", cScope);
+        cEnv.put("CJ_SCOPE", s.cScope());
         cEnv.put("CJ_ROLE", "canary");
         cEnv.put("INJECT_TYPE", t.condition().type());
         cEnv.put("INJECT_SIZE", Double.toString(t.condition().size()));
         cEnv.put("INJECT_ONSET_S", "0");
-        String heap = plan.path("heap").asText("256m"), mem = plan.path("memLimit").asText("420m");
-        long launch = System.currentTimeMillis();
-        Thread tb = Thread.ofVirtual().start(() -> run(() -> docker.runTarget(bName, bEnv, heap, mem)));
-        Thread tc = Thread.ofVirtual().start(() -> run(() -> docker.runTarget(cName, cEnv, heap, mem)));
+        String heap = plan.path("heap").asText("224m"), mem = plan.path("memLimit").asText("460m");
+        s.launch = System.currentTimeMillis();
+        Thread tb = Thread.ofVirtual().start(() -> run(() -> docker.runTarget(s.bName(), bEnv, heap, mem)));
+        Thread tc = Thread.ofVirtual().start(() -> run(() -> docker.runTarget(s.cName(), cEnv, heap, mem)));
         tb.join();
         tc.join();
-        long bReady = waitScraped(bScope), cReady = waitScraped(cScope);
-        long ready = Math.max(bReady, cReady);
-        long step = plan.path("stepSeconds").asLong(10);
-        long warmup = plan.path("warmupSeconds").asLong(60);
-        long window = plan.path("windowSeconds").asLong(360);
-        long startSec = ((ready / 1000 + warmup) / step + 1) * step; // first point covers (start - step, start]
-        long endSec = startSec + window - step;
-        System.out.printf("[%s] %s %s %s size=%s: ready after %ds (skew %ds), window %d..%d%n", lane, t.id(),
-                t.condition().scenario(), t.condition().type(), t.condition().size(),
-                (ready - launch) / 1000, Math.abs(bReady - cReady) / 1000, startSec, endSec);
-        sleepUntil((endSec + 4) * 1000);
+        post(loadgen + "/rate?lane=" + s.lane + "&rps=" + plan.path("laneRps").asDouble(80));
+    }
+
+    /** Fetches and stores a trial; returns false (and records only a reject line) if the lane did not get its traffic. */
+    boolean finish(Started s, long startSec, long endSec, long step, long warmup) throws Exception {
+        Trial t = s.trial;
+        String lane = s.lane, bScope = s.bScope(), cScope = s.cScope();
+        long launch = s.launch, bReady = s.bReady, cReady = s.cReady;
+        Map<String, Object> loadBefore = s.loadBefore;
         Map<String, Recording.Pair> series = new LinkedHashMap<>();
         for (CanaryConfig.MetricConfig m : config.metrics()) {
             String tpl = m.promQlTemplate();
@@ -202,14 +252,36 @@ public final class TrialRunner {
         meta.put("load_before", loadBefore);
         meta.put("load_after", Machine.load());
         Recording rec = new Recording(t.id(), t.condition().scenario(), cond, startSec * 1000, step * 1000, series, meta);
-        String line = JSON.writeValueAsString(rec) + "\n";
+        String problem = trafficProblem(rec, plan.path("laneRps").asDouble(80) / 2, plan.path("minRateShare").asDouble(0.6));
         synchronized (TrialRunner.class) {
-            Files.writeString(out, line, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            if (problem == null) {
+                Files.writeString(out, JSON.writeValueAsString(rec) + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            } else {
+                System.out.printf("[%s] %s rejected: %s%n", lane, t.id(), problem);
+                Map<String, Object> reject = new LinkedHashMap<>();
+                reject.put("rejected", problem);
+                reject.put("recording", rec);
+                Path rejects = out.resolveSibling(out.getFileName().toString().replace(".jsonl", "_rejected.jsonl"));
+                Files.writeString(rejects, JSON.writeValueAsString(reject) + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            }
         }
-        if (!plan.path("keepContainers").asBoolean(false)) {
-            docker.remove(bName);
-            docker.remove(cName);
+        return problem == null;
+    }
+
+    /**
+     * A run only counts if both sides got their share of traffic for the whole window: every interval's
+     * request rate must be present and at least minShare (60% by default) of the expected per-instance rate.
+     */
+    static String trafficProblem(Recording rec, double expectedPerInstance, double minShare) {
+        Recording.Pair p = rec.series().get("request_rate");
+        if (p == null) return null;
+        for (double[] side : new double[][]{p.control(), p.experiment()}) {
+            for (double v : side) {
+                if (Double.isNaN(v) || v < minShare * expectedPerInstance)
+                    return String.format(java.util.Locale.ROOT, "request rate %.1f/s in an interval, expected about %.0f/s", v, expectedPerInstance);
+            }
         }
+        return null;
     }
 
     interface IoAction { void run() throws Exception; }
@@ -223,7 +295,7 @@ public final class TrialRunner {
     }
 
     long waitScraped(String scope) throws Exception {
-        long deadline = System.currentTimeMillis() + 180_000;
+        long deadline = System.currentTimeMillis() + 300_000;
         while (System.currentTimeMillis() < deadline) {
             if (prom.count("process_uptime_seconds{cj_scope=\"" + scope + "\"}") > 0) return System.currentTimeMillis();
             Thread.sleep(1000);

@@ -8,12 +8,16 @@ import java.util.Map;
 public final class Main {
     public static void main(String[] args) throws Exception {
         if (args.length == 0) {
-            System.err.println("commands: trials");
+            System.err.println("commands: trials, evaluate, kayenta-diff, simulate, rollout");
             System.exit(2);
         }
         Map<String, String> a = parse(Arrays.copyOfRange(args, 1, args.length));
         switch (args[0]) {
             case "trials" -> TrialRunner.main(a);
+            case "kayenta-diff" -> KayentaDiff.main(a);
+            case "evaluate" -> Evaluate.main(a);
+            case "simulate" -> Simulate.main(a);
+            case "rollout" -> RolloutRunner.main(a);
             default -> {
                 System.err.println("unknown command " + args[0]);
                 System.exit(2);

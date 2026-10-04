@@ -1,0 +1,28 @@
+server:
+  port: 8090
+spring:
+  application:
+    name: canaryjudge
+  threads:
+    virtual:
+      enabled: true
+  main:
+    banner-mode: off
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    parser:
+      allow-non-numeric-numbers: true
+canaryjudge:
+  prometheus-url: ${PROMETHEUS_URL:http://localhost:9090}
+  splitter-url: ${SPLITTER_URL:http://localhost:8000}
+  config-dir: ${CONFIG_DIR:configs}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+logging:
+  level:
+    root: warn
+    io.canaryjudge: info

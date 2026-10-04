@@ -1,0 +1,119 @@
+name: CanaryJudge canary gate
+description: >
+  Judge a canary against its baseline (Mann-Whitney per metric with Kayenta's config semantics, plus an
+  always-valid sequential test) and fail the job if the canary is worse. Takes recorded series as CSV or a
+  recording file, or fetches them from Prometheus.
+branding:
+  icon: shield
+  color: yellow
+
+inputs:
+  config:
+    description: Canary config in Kayenta's JSON format.
+    required: true
+  baseline:
+    description: CSV of the baseline's metrics, one row per interval (with canary).
+    required: false
+  canary:
+    description: CSV of the canary's metrics, one row per interval (with baseline).
+    required: false
+  recording:
+    description: A recording JSON (from canaryjudge fetch) instead of two CSV files.
+    required: false
+  prometheus-url:
+    description: Fetch the series from this Prometheus instead (needs the scope and time inputs).
+    required: false
+  baseline-scope:
+    description: Value substituted for ${scope} in the config's PromQL templates for the baseline.
+    required: false
+  canary-scope:
+    description: Value substituted for ${scope} for the canary.
+    required: false
+  start:
+    description: Window start, epoch seconds.
+    required: false
+  end:
+    description: Window end, epoch seconds.
+    required: false
+  step:
+    description: Seconds per interval.
+    required: false
+    default: "10"
+  extra-series:
+    description: JSON map of extra series to fetch (counters for rate metrics).
+    required: false
+  mode:
+    description: fixed, sequential, or both (fail if either fails).
+    required: false
+    default: both
+  alpha:
+    description: False-alarm rate of the sequential judge.
+    required: false
+    default: "0.05"
+  pass-threshold:
+    description: Score at or above which the fixed-horizon judge passes.
+    required: false
+    default: "95"
+  marginal-threshold:
+    description: Score below which the fixed-horizon judge fails.
+    required: false
+    default: "75"
+  fail-on-marginal:
+    description: Treat a marginal score as a failure.
+    required: false
+    default: "true"
+
+outputs:
+  verdict:
+    description: pass, marginal or fail.
+    value: ${{ steps.judge.outputs.verdict }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - name: Build the CanaryJudge CLI
+      shell: bash
+      run: |
+        cd "$GITHUB_ACTION_PATH"
+        ./gradlew -q --no-daemon :cli:jar
+        echo "CJ_JAR=$GITHUB_ACTION_PATH/cli/build/libs/canaryjudge-cli.jar" >> "$GITHUB_ENV"
+    - name: Fetch series from Prometheus
+      if: inputs.prometheus-url != ''
+      shell: bash
+      run: |
+        extra=()
+        if [ -n "${{ inputs.extra-series }}" ]; then extra=(--extra "${{ inputs.extra-series }}"); fi
+        java -jar "$CJ_JAR" fetch --config "${{ inputs.config }}" --prometheus "${{ inputs.prometheus-url }}" \
+          --baseline-scope "${{ inputs.baseline-scope }}" --canary-scope "${{ inputs.canary-scope }}" \
+          --start "${{ inputs.start }}" --end "${{ inputs.end }}" --step "${{ inputs.step }}" "${extra[@]}" \
+          --out "$RUNNER_TEMP/canary-recording.json"
+        echo "CJ_RECORDING=$RUNNER_TEMP/canary-recording.json" >> "$GITHUB_ENV"
+    - name: Judge
+      id: judge
+      shell: bash
+      run: |
+        if [ -n "${CJ_RECORDING:-}" ]; then src=(--recording "$CJ_RECORDING");
+        elif [ -n "${{ inputs.recording }}" ]; then src=(--recording "${{ inputs.recording }}");
+        else src=(--baseline "${{ inputs.baseline }}" --canary "${{ inputs.canary }}" --step "${{ inputs.step }}"); fi
+        set +e
+        java -jar "$CJ_JAR" judge --config "${{ inputs.config }}" "${src[@]}" --mode "${{ inputs.mode }}" \
+          --alpha "${{ inputs.alpha }}" --pass "${{ inputs.pass-threshold }}" --marginal "${{ inputs.marginal-threshold }}" \
+          | tee "$RUNNER_TEMP/canaryjudge.txt"
+        code=${PIPESTATUS[0]}
+        set -e
+        case $code in
+          0) verdict=pass ;;
+          2) verdict=marginal ;;
+          1) verdict=fail ;;
+          *) echo "canaryjudge exited with $code"; exit $code ;;
+        esac
+        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+        { echo "### Canary verdict: $verdict"; echo '```'; cat "$RUNNER_TEMP/canaryjudge.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+        if [ "$verdict" = fail ] || { [ "$verdict" = marginal ] && [ "${{ inputs.fail-on-marginal }}" = true ]; }; then
+          echo "::error::canary $verdict"
+          exit 1
+        fi

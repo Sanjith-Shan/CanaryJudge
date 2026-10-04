@@ -94,10 +94,14 @@ public final class SequentialJudge {
                             if (Double.isNaN(c)) c = 0;
                         }
                         if (!Double.isNaN(b) && !Double.isNaN(c)) {
+                            // the tolerated shift moves the null: test whether the shift exceeds the margin
+                            double margin = s.sequential().margin();
+                            double sign = s.direction() == AnalysisSettings.Direction.DECREASE ? -1 : 1;
                             if (s.sequential().logScale()) {
-                                if (b > 0 && c > 0) t.add(Math.log(c) - Math.log(b));
+                                double shift = margin > 0 ? Math.log(margin) : 0;
+                                if (b > 0 && c > 0) t.add(Math.log(c) - Math.log(b) - sign * shift);
                             } else {
-                                t.add(c - b);
+                                t.add(c - b - sign * margin);
                             }
                         }
                     }

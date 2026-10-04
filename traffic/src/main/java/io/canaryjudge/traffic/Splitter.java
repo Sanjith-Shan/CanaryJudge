@@ -33,7 +33,11 @@ import java.util.concurrent.Executors;
 public final class Splitter {
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    static final int MAX_IN_FLIGHT = 2000;
+
     private final Map<String, Lane> lanes = new ConcurrentHashMap<>();
+    private final java.util.concurrent.Semaphore inFlight = new java.util.concurrent.Semaphore(MAX_IN_FLIGHT);
+    private final java.util.concurrent.atomic.LongAdder shed = new java.util.concurrent.atomic.LongAdder();
     private final String hostPattern;
     private final HttpClient client;
 
@@ -41,7 +45,7 @@ public final class Splitter {
         this.hostPattern = hostPattern;
         this.client = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(2))
+                .connectTimeout(Duration.ofSeconds(1))
                 .executor(Executors.newVirtualThreadPerTaskExecutor())
                 .build();
     }
@@ -67,13 +71,24 @@ public final class Splitter {
             if (path.equals("/metrics")) {
                 StringBuilder sb = new StringBuilder();
                 lanes.values().forEach(l -> l.prometheus(sb));
+                Runtime rt = Runtime.getRuntime();
+                sb.append("cj_splitter_in_flight ").append(MAX_IN_FLIGHT - inFlight.availablePermits()).append('\n');
+                sb.append("cj_splitter_shed_total ").append(shed.sum()).append('\n');
+                sb.append("cj_splitter_heap_used_bytes ").append(rt.totalMemory() - rt.freeMemory()).append('\n');
                 reply(ex, 200, sb.toString(), "text/plain; version=0.0.4");
             } else if (path.equals("/health")) {
                 reply(ex, 200, "{\"status\":\"UP\"}", "application/json");
             } else if (path.startsWith("/admin/lanes/")) {
                 admin(ex, path.substring("/admin/lanes/".length()));
+            } else if (inFlight.tryAcquire()) {
+                try {
+                    proxy(ex, path);
+                } finally {
+                    inFlight.release();
+                }
             } else {
-                proxy(ex, path);
+                shed.increment(); // never queue without bound: an overloaded proxy answers 503 at once
+                reply(ex, 503, "{\"error\":\"splitter overloaded\"}", "application/json");
             }
         } catch (IllegalArgumentException e) {
             reply(ex, 400, "{\"error\":\"" + e.getMessage() + "\"}", "application/json");
@@ -117,7 +132,7 @@ public final class Splitter {
         int status;
         byte[] body;
         try {
-            HttpResponse<byte[]> r = client.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build(),
+            HttpResponse<byte[]> r = client.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(5)).GET().build(),
                     HttpResponse.BodyHandlers.ofByteArray());
             status = r.statusCode();
             body = r.body();

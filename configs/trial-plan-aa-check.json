@@ -1,0 +1,14 @@
+{
+  "prefix": "aacheck",
+  "seed": 3,
+  "laneRps": 80,
+  "warmupSeconds": 90,
+  "windowSeconds": 180,
+  "stepSeconds": 10,
+  "heap": "224m",
+  "memLimit": "460m",
+  "conditions": [
+    { "scenario": "aa", "type": "none", "size": 0, "repeats": 2 },
+    { "scenario": "leak_4k", "type": "leak", "size": 4096, "repeats": 1 }
+  ]
+}

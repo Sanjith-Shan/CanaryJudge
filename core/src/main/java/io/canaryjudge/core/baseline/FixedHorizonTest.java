@@ -31,6 +31,13 @@ public final class FixedHorizonTest {
             double[] c = MetricClassifier.transform(p.control(), s);
             double[] e = MetricClassifier.transform(p.experiment(), s);
             if (c.length < 2 || e.length < 2) continue;
+            double margin = s.sequential().margin();
+            if (margin > 0 && s.direction() == io.canaryjudge.core.config.AnalysisSettings.Direction.INCREASE) {
+                // same tolerated shift as the sequential judge: compare the canary scaled back by the margin
+                final double m0 = margin;
+                e = s.sequential().logScale() ? java.util.Arrays.stream(e).map(v -> v / m0).toArray()
+                        : java.util.Arrays.stream(e).map(v -> v - m0).toArray();
+            }
             MannWhitney.Alternative alt = switch (s.direction()) {
                 case INCREASE -> MannWhitney.Alternative.GREATER;
                 case DECREASE -> MannWhitney.Alternative.LESS;

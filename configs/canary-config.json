@@ -1,6 +1,6 @@
 {
   "id": "canaryjudge-target",
-  "name": "target service golden signals",
+  "name": "canaryjudge-target",
   "description": "Latency, errors and saturation of the sample target service. Kayenta canary config format; the canaryjudge blocks hold the sequential judge's settings and are ignored by Kayenta.",
   "applications": ["ad-hoc"],
   "configVersion": "1",
@@ -79,17 +79,17 @@
       }
     },
     {
-      "name": "heap_used",
+      "name": "heap_after_gc",
       "groups": ["Saturation"],
       "scopeName": "default",
       "query": {
         "type": "prometheus",
-        "metricName": "jvm_memory_used_bytes",
-        "customInlineTemplate": "PromQL:sum(jvm_memory_used_bytes{cj_scope=\"${scope}\",area=\"heap\"})"
+        "metricName": "cj_heap_after_gc_bytes",
+        "customInlineTemplate": "PromQL:max(cj_heap_after_gc_bytes{cj_scope=\"${scope}\"})"
       },
       "analysisConfigurations": {
-        "canary": { "direction": "increase", "nanStrategy": "remove" },
-        "canaryjudge": { "sequential": { "type": "mean" } }
+        "canary": { "direction": "increase", "nanStrategy": "remove", "effectSize": { "allowedIncrease": 1.25 } },
+        "canaryjudge": { "sequential": { "type": "mean", "logScale": true, "margin": 1.25 } }
       }
     }
   ]

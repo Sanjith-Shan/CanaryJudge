@@ -20,6 +20,9 @@ scrape_configs:
           - cj-r1-primary:8080
           - cj-r1-baseline:8080
           - cj-r1-canary:8080
+          - cj-r2-primary:8080
+          - cj-r2-baseline:8080
+          - cj-r2-canary:8080
   - job_name: splitter
     static_configs:
       - targets: ['cj-splitter:8000']

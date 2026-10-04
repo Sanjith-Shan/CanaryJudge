@@ -1,2 +1,2 @@
 rootProject.name = 'canaryjudge'
-include 'core', 'target', 'traffic', 'bench'
+include 'core', 'target', 'traffic', 'server', 'bench', 'cli'

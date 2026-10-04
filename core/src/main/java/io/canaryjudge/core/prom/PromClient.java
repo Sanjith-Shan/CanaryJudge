@@ -1,4 +1,4 @@
-package io.canaryjudge.bench;
+package io.canaryjudge.core.prom;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,7 +63,7 @@ public final class PromClient {
         return JSON.readTree(r.body());
     }
 
-    static double parse(String s) {
+    public static double parse(String s) {
         return switch (s) {
             case "NaN" -> Double.NaN;
             case "+Inf" -> Double.POSITIVE_INFINITY;
