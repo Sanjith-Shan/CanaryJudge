@@ -10,9 +10,32 @@ import java.util.Map;
 public final class Machine {
     private Machine() {}
 
+    static final boolean WINDOWS = System.getProperty("os.name").startsWith("Windows");
+
     public static Map<String, Object> describe() {
         Map<String, Object> m = new LinkedHashMap<>();
+        if ("true".equals(System.getenv("GITHUB_ACTIONS"))) {
+            m.put("host", "GitHub Actions runner (" + System.getenv().getOrDefault("RUNNER_OS", "?") + ", " + System.getenv().getOrDefault("ImageOS", "?") + ")");
+            m.put("cpu", cpuModel());
+            m.put("cpus_visible", Runtime.getRuntime().availableProcessors());
+            m.put("mem_gb", Math.round(memTotalKb() / 1024.0 / 1024.0 * 10) / 10.0);
+            m.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version"));
+            m.put("java", System.getProperty("java.version"));
+            m.put("git", System.getenv().getOrDefault("GITHUB_SHA", "unknown"));
+            return m;
+        }
         m.put("host", "mini PC (Acemagic K1), shared with other jobs");
+        if (WINDOWS) {
+            // native Windows run (no WSL): every process shares the host's 4 cores and 16 GB
+            m.put("cpu", "AMD Ryzen 3 4300U with Radeon Graphics");
+            m.put("cores_host", 4);
+            m.put("ram_gb_host", 16);
+            m.put("cpus_visible", Runtime.getRuntime().availableProcessors());
+            m.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version") + " (native, no WSL)");
+            m.put("java", System.getProperty("java.version"));
+            m.put("git", git());
+            return m;
+        }
         m.put("cpu", cpuModel());
         m.put("cores_host", 4);
         m.put("ram_gb_host", 16);
@@ -36,6 +59,10 @@ public final class Machine {
         long total = memTotalKb(), avail = memAvailableKb();
         if (total > 0) m.put("wsl_mem_used_pct", Math.round((total - avail) * 1000.0 / total) / 10.0);
         m.put("windows_host_cpu_pct", windowsCpu());
+        if (WINDOWS) {
+            var os = (com.sun.management.OperatingSystemMXBean) java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+            m.put("host_mem_used_pct", Math.round((1 - os.getFreeMemorySize() / (double) os.getTotalMemorySize()) * 1000) / 10.0);
+        }
         m.put("ts", java.time.OffsetDateTime.now().toString());
         return m;
     }

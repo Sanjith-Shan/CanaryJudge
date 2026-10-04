@@ -185,7 +185,9 @@ public final class LoadGen {
             String[] p = spec.split(":");
             g.setLane(p[0], Double.parseDouble(p[1]));
         }
-        HttpServer control = HttpServer.create(new InetSocketAddress(a.getInt("control-port", 8001)), 64);
+        String bind = a.get("bind", "");
+        HttpServer control = HttpServer.create(bind.isBlank() ? new InetSocketAddress(a.getInt("control-port", 8001))
+                : new InetSocketAddress(bind, a.getInt("control-port", 8001)), 64);
         control.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         control.createContext("/", ex -> {
             try {

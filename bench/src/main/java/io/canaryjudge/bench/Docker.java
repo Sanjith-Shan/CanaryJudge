@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /** Starts and removes target containers through the docker CLI. */
-public final class Docker {
+public final class Docker implements Launcher {
     private final String image;
     private final String network;
 

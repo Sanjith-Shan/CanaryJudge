@@ -31,6 +31,8 @@ public final class KayentaDiff {
         Path out = Path.of(a.getOrDefault("out", "results/exp4.jsonl"));
         int[] windows = java.util.Arrays.stream(a.getOrDefault("windows", "12,24,36").split(",")).mapToInt(Integer::parseInt).toArray();
         double pass = 95, marginal = 75;
+        // a fresh id per run, so a second run against the same Kayenta does not collide with the first
+        config = config.renamed("-" + Long.toString(System.currentTimeMillis(), 36));
         String kConfigId = kayenta.storeConfig(config);
         String cjConfigId = cjApi == null ? null : cjApi.storeConfig(config);
         List<Recording> recs = Recordings.read(Path.of(a.getOrDefault("trials", "results/trials.jsonl")));

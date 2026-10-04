@@ -80,6 +80,12 @@ public record CanaryConfig(
         return MAPPER.readValue(json, CanaryConfig.class);
     }
 
+    /** The same config under a new id and name (Kayenta refuses a second config with an existing name). */
+    public CanaryConfig renamed(String suffix) {
+        return new CanaryConfig(id + suffix, name + suffix, description, applications, judge, metrics, templates, classifier,
+                createdTimestamp, updatedTimestamp, configVersion);
+    }
+
     public CanaryConfig withId(String newId) {
         return new CanaryConfig(newId, name, description, applications, judge, metrics, templates, classifier,
                 createdTimestamp, updatedTimestamp, configVersion);

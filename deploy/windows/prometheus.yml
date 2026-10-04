@@ -1,0 +1,16 @@
+# Prometheus for the native Windows stack (no Docker): every process listens on 127.0.0.1 on a fixed port.
+global:
+  scrape_interval: 2s
+  scrape_timeout: 2s
+scrape_configs:
+  - job_name: target
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['127.0.0.1:28101', '127.0.0.1:28102', '127.0.0.1:28103', '127.0.0.1:28111', '127.0.0.1:28112', '127.0.0.1:28121', '127.0.0.1:28122']
+  - job_name: splitter
+    static_configs:
+      - targets: ['127.0.0.1:28000']
+  - job_name: canaryjudge
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['127.0.0.1:28090']

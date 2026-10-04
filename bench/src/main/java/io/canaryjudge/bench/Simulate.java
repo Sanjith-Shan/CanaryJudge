@@ -13,7 +13,8 @@ import java.util.SplittableRandom;
 /**
  * Monte Carlo A/A canaries: how often each way of checking a healthy canary raises a false alarm, as a
  * function of how many times it is checked. Baseline and canary get per-interval values from the same
- * distribution (log-normal, like a latency quantile) with a shared load term, so pairing by time matters, and
+ * distribution (log-normal, like a latency quantile), either independent or with a shared load term (both sides
+ * on one busy box, which makes unpaired tests conservative and favors pairing by time), and
  * optionally AR(1) noise, which breaks the independence the sequential t-test assumes.
  *
  * <ul>
@@ -35,14 +36,14 @@ public final class Simulate {
         int[] checkpoints = {6, 12, 18, 36, 72, 144};
         double[] phis = {0.0, 0.3, 0.6};
         StringBuilder sb = new StringBuilder();
-        for (double phi : phis) {
+        for (double loadSd : new double[]{0.0, 0.15}) for (double phi : phis) {
             int[][] firstAlarm = new int[4][runs]; // look index of first alarm (1-based), 0 = never
-            SplittableRandom rnd = new SplittableRandom(seed + (long) (phi * 1000));
+            SplittableRandom rnd = new SplittableRandom(seed + (long) (phi * 1000) + (long) (loadSd * 100));
             for (int run = 0; run < runs; run++) {
                 double[] b = new double[maxLooks], c = new double[maxLooks];
                 double nb = 0, nc = 0;
                 for (int i = 0; i < maxLooks; i++) {
-                    double load = 0.15 * gauss(rnd); // shared by both, like box contention
+                    double load = loadSd * gauss(rnd); // shared by both sides, like contention on one box
                     nb = phi * nb + Math.sqrt(1 - phi * phi) * gauss(rnd);
                     nc = phi * nc + Math.sqrt(1 - phi * phi) * gauss(rnd);
                     b[i] = 0.025 * Math.exp(load + 0.1 * nb);
@@ -72,7 +73,7 @@ public final class Simulate {
                 for (int m = 1; m < names.length; m++) {
                     int hits = 0;
                     for (int run = 0; run < runs; run++) if (firstAlarm[m][run] > 0 && firstAlarm[m][run] <= cp) hits++;
-                    sb.append(row(phi, names[m], cp, hits, runs, seed));
+                    sb.append(row(loadSd, phi, names[m], cp, hits, runs, seed));
                 }
             }
             // fixed horizon at each checkpoint, simulated separately so each horizon is a single look
@@ -83,7 +84,7 @@ public final class Simulate {
                     double[] b = new double[cp], c = new double[cp];
                     double nb = 0, nc = 0;
                     for (int i = 0; i < cp; i++) {
-                        double load = 0.15 * gauss(r2);
+                        double load = loadSd * gauss(r2);
                         nb = phi * nb + Math.sqrt(1 - phi * phi) * gauss(r2);
                         nc = phi * nc + Math.sqrt(1 - phi * phi) * gauss(r2);
                         b[i] = 0.025 * Math.exp(load + 0.1 * nb);
@@ -91,17 +92,18 @@ public final class Simulate {
                     }
                     if (MannWhitney.asymptotic(c, b, MannWhitney.Alternative.GREATER, true).pValue() <= ALPHA) hits++;
                 }
-                sb.append(row(phi, "fixed", cp, hits, runs, seed));
+                sb.append(row(loadSd, phi, "fixed", cp, hits, runs, seed));
             }
-            System.out.printf("phi=%.1f done%n", phi);
+            System.out.printf("load_sd=%.2f phi=%.1f done%n", loadSd, phi);
         }
         Files.writeString(out, sb.toString(), StandardCharsets.UTF_8);
         System.out.print(sb);
     }
 
-    static String row(double phi, String method, int looks, int hits, int runs, long seed) throws Exception {
+    static String row(double loadSd, double phi, String method, int looks, int hits, int runs, long seed) throws Exception {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("exp", "sim_aa");
+        m.put("load_sd", loadSd);
         m.put("phi", phi);
         m.put("method", method);
         m.put("looks", looks);

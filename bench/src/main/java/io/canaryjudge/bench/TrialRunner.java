@@ -45,14 +45,14 @@ public final class TrialRunner {
     private final CanaryConfig config;
     private final Map<String, String> extra;
     private final PromClient prom;
-    private final Docker docker;
+    private final Launcher docker;
     private final String loadgen;
     private final Path out;
     private final double maxHostCpu;
     private final HttpClient http = HttpClient.newHttpClient();
     private final Map<String, Integer> attempts = new java.util.concurrent.ConcurrentHashMap<>();
 
-    TrialRunner(JsonNode plan, CanaryConfig config, Map<String, String> extra, PromClient prom, Docker docker,
+    TrialRunner(JsonNode plan, CanaryConfig config, Map<String, String> extra, PromClient prom, Launcher docker,
                 String loadgen, Path out, double maxHostCpu) {
         this.plan = plan;
         this.config = config;
@@ -71,7 +71,7 @@ public final class TrialRunner {
         Map<String, String> extra = JSON.readValue(Files.readString(Path.of(a.getOrDefault("extra", "configs/recording-extra-series.json"))), LinkedHashMap.class);
         TrialRunner r = new TrialRunner(plan, config, extra,
                 new PromClient(a.getOrDefault("prom", "http://localhost:19090")),
-                new Docker(a.getOrDefault("image", "canaryjudge:dev"), a.getOrDefault("network", "cj-net")),
+                Launcher.from(a),
                 a.getOrDefault("loadgen", "http://localhost:18001"),
                 Path.of(a.getOrDefault("out", "results/trials.jsonl")),
                 Double.parseDouble(a.getOrDefault("max-host-cpu", "70")));

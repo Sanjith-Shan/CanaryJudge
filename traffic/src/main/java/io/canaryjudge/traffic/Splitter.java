@@ -39,6 +39,7 @@ public final class Splitter {
     private final java.util.concurrent.Semaphore inFlight = new java.util.concurrent.Semaphore(MAX_IN_FLIGHT);
     private final java.util.concurrent.atomic.LongAdder shed = new java.util.concurrent.atomic.LongAdder();
     private final String hostPattern;
+    private final Map<String, String> routes = new ConcurrentHashMap<>();
     private final HttpClient client;
 
     Splitter(String hostPattern) {
@@ -53,12 +54,18 @@ public final class Splitter {
     static void run(Args a) throws IOException {
         int port = a.getInt("port", 8000);
         Splitter s = new Splitter(a.get("host-pattern", "http://cj-%s-%s:8080"));
+        // explicit routes ("r1.canary=http://127.0.0.1:28103,..."), for running without container DNS
+        for (String r : a.get("routes", "").split(",")) {
+            int eq = r.indexOf('=');
+            if (eq > 0) s.routes.put(r.substring(0, eq).trim(), r.substring(eq + 1).trim());
+        }
         for (String spec : a.get("lanes", "").split(",")) {
             if (spec.isBlank()) continue;
             String[] p = spec.split(":");
             s.lanes.put(p[0], new Lane(p[0], Double.parseDouble(p[1]), Double.parseDouble(p[2]), p.length < 4 || !p[3].equals("request")));
         }
-        HttpServer server = HttpServer.create(new InetSocketAddress(port), 1024);
+        String bind = a.get("bind", "");
+        HttpServer server = HttpServer.create(bind.isBlank() ? new InetSocketAddress(port) : new InetSocketAddress(bind, port), 1024);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.createContext("/", s::handle);
         server.start();
@@ -128,7 +135,8 @@ public final class Splitter {
         String rawQuery = ex.getRequestURI().getRawQuery();
         long user = Long.parseLong(query(rawQuery).getOrDefault("user", "0"));
         String role = lane.route(user);
-        String url = String.format(hostPattern, laneName, role) + path.substring(slash) + (rawQuery == null ? "" : "?" + rawQuery);
+        String base = routes.getOrDefault(laneName + "." + role, String.format(hostPattern, laneName, role));
+        String url = base + path.substring(slash) + (rawQuery == null ? "" : "?" + rawQuery);
         int status;
         byte[] body;
         try {

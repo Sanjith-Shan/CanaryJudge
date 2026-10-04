@@ -34,7 +34,7 @@ public final class RolloutRunner {
         String server = a.getOrDefault("server", "http://localhost:18090");
         String loadgen = a.getOrDefault("loadgen", "http://localhost:18001");
         PromClient prom = new PromClient(a.getOrDefault("prom", "http://localhost:19090"));
-        Docker docker = new Docker(a.getOrDefault("image", "canaryjudge:dev"), "cj-net");
+        Launcher docker = Launcher.from(a);
         List<String> lanes = List.of(a.getOrDefault("lanes", "r1,r2").split(","));
         KayentaClient http = new KayentaClient(server);
 
@@ -80,7 +80,7 @@ public final class RolloutRunner {
         for (Thread t : threads) t.join();
     }
 
-    static void runOne(JsonNode plan, String lane, Run r, Docker docker, PromClient prom, KayentaClient server, Path out) throws Exception {
+    static void runOne(JsonNode plan, String lane, Run r, Launcher docker, PromClient prom, KayentaClient server, Path out) throws Exception {
         String bName = "cj-" + lane + "-baseline", cName = "cj-" + lane + "-canary";
         String bScope = r.id() + "-baseline", cScope = r.id() + "-canary";
         docker.remove(bName);
