@@ -22,7 +22,7 @@ k3d cluster create "$CLUSTER" --servers 1 --agents 0 --no-lb --wait \
 k3d image import -c "$CLUSTER" canaryjudge:dev prom/prometheus:v3.15.0
 
 k create namespace argo-rollouts
-k apply -n argo-rollouts -f "$ARGO_INSTALL" >/dev/null
+k apply --server-side -n argo-rollouts -f "$ARGO_INSTALL" >/dev/null
 k -n argo-rollouts rollout status deploy/argo-rollouts --timeout=300s
 
 k create configmap canaryjudge-configs --from-file=configs/canary-config.json --from-file=configs/recording-extra-series.json
