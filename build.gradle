@@ -14,7 +14,7 @@ subprojects {
     java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
     tasks.withType(JavaCompile).configureEach { options.compilerArgs += ['-parameters'] }
     tasks.withType(Test).configureEach {
-        useJUnitPlatform { includeEngines 'junit-jupiter', 'jqwik' }
+        useJUnitPlatform()
         testLogging { events 'failed'; exceptionFormat 'full' }
         maxHeapSize = '768m'
     }
