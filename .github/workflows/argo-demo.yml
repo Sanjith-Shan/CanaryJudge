@@ -1,0 +1,39 @@
+name: argo-demo
+
+# Argo Rollouts end to end on a k3d cluster in a GitHub runner (scripts/argo_demo.sh): a healthy update that is
+# promoted and an update with a 50% latency regression that the CanaryJudge analysis aborts. The captures and the
+# results rows are uploaded as an artifact and committed to docs/argo/ and results/argo.jsonl by hand.
+on:
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the image
+        run: bash scripts/image.sh
+      - name: Tools
+        run: |
+          mkdir -p "$HOME/bin" && cd "$HOME/bin"
+          curl -fsSL -o k3d https://github.com/k3d-io/k3d/releases/download/v5.8.3/k3d-linux-amd64
+          curl -fsSL -o kubectl-argo-rollouts https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          chmod +x k3d kubectl-argo-rollouts
+          curl -fsSL -o "$HOME/argo-rollouts-install.yaml" https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          docker pull -q prom/prometheus:v3.15.0
+      - name: Run the demo
+        run: ARGO_INSTALL="$HOME/argo-rollouts-install.yaml" bash scripts/argo_demo.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: argo
+          path: |
+            docs/argo/
+            results/argo.jsonl
