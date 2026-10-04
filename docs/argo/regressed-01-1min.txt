@@ -1,0 +1,37 @@
+Name:            target
+Namespace:       default
+Status:          ◌ Progressing
+Message:         more replicas need to be updated
+Strategy:        Canary
+  Step:          0/3
+  SetWeight:     0
+  ActualWeight:  0
+Images:          canaryjudge:dev (stable, Σ:baseline, Σ:canary)
+Replicas:
+  Desired:       3
+  Current:       3
+  Updated:       0
+  Ready:         3
+  Available:     3
+
+NAME                                                KIND         STATUS         AGE    INFO
+⟳ target                                            Rollout      ◌ Progressing  7m4s   
+├──# revision:3                                                                        
+│  ├──⧉ target-7d77697c94                           ReplicaSet   • ScaledDown   61s    canary
+│  └──Σ target-7d77697c94-3-0                       Experiment   ◌ Running      61s    
+│     ├──⧉ target-7d77697c94-3-0-baseline           ReplicaSet   ✔ Healthy      61s    
+│     │  └──□ target-7d77697c94-3-0-baseline-v7cs7  Pod          ✔ Running      61s    ready:1/1
+│     ├──⧉ target-7d77697c94-3-0-canary             ReplicaSet   ✔ Healthy      61s    
+│     │  └──□ target-7d77697c94-3-0-canary-gtrt9    Pod          ✔ Running      61s    ready:1/1
+│     └──α target-7d77697c94-3-0-canaryjudge        AnalysisRun  ◌ Running      57s    ✔ 6
+├──# revision:2                                                                        
+│  ├──⧉ target-54584c9bd8                           ReplicaSet   ✔ Healthy      5m54s  stable
+│  │  ├──□ target-54584c9bd8-5gksv                  Pod          ✔ Running      110s   ready:1/1
+│  │  ├──□ target-54584c9bd8-c8br9                  Pod          ✔ Running      107s   ready:1/1
+│  │  └──□ target-54584c9bd8-99f8v                  Pod          ✔ Running      73s    ready:1/1
+│  └──Σ target-54584c9bd8-2-0                       Experiment   ✔ Successful   5m54s  
+│     ├──⧉ target-54584c9bd8-2-0-baseline           ReplicaSet   • ScaledDown   5m54s  delay:passed
+│     ├──⧉ target-54584c9bd8-2-0-canary             ReplicaSet   • ScaledDown   5m54s  delay:passed
+│     └──α target-54584c9bd8-2-0-canaryjudge        AnalysisRun  ✔ Successful   5m50s  ✔ 25
+└──# revision:1                                                                        
+   └──⧉ target-57b6c58ddb                           ReplicaSet   • ScaledDown   7m4s   

@@ -59,8 +59,8 @@ update() { # name inject_type inject_size expected
   capture "$name-final"
   local secs=$(( $(date +%s) - t0 ))
   local ar; ar=$(k get analysisrun --sort-by=.metadata.creationTimestamp -o name | tail -1)
-  local measurements; measurements=$(k get "$ar" -o jsonpath='{.status.metricResults[0].count} measurements, {.status.metricResults[0].failed} failed, phase {.status.phase}')
-  local last; last=$(k get "$ar" -o jsonpath='{.status.metricResults[0].measurements[-1:].value}')
+  local measurements; measurements=$(k get "$ar" -o jsonpath='{.status.metricResults[0].count} measurements, {.status.metricResults[0].failed} failed, phase {.status.phase}' | sed 's/,  failed/, 0 failed/')
+  local last; last=$(k get "$ar" -o jsonpath='{.status.metricResults[0].measurements[-1:].value}' | tr -d '"')
   local aborted; aborted=$(k get rollout target -o jsonpath='{.status.abort}')
   local outcome
   if [ "$aborted" = true ]; then outcome="aborted after ${secs}s (${measurements}; last verdict ${last})";

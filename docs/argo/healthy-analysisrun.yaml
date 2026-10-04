@@ -1,0 +1,93 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisRun
+metadata:
+  creationTimestamp: "2026-10-04T23:18:16Z"
+  generation: 29
+  name: target-54584c9bd8-2-0-canaryjudge
+  namespace: default
+  ownerReferences:
+  - apiVersion: argoproj.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Experiment
+    name: target-54584c9bd8-2-0
+    uid: 8f198b19-1204-4b36-92a4-c5ea9b35e2d4
+  resourceVersion: "991"
+  uid: 301a2100-2279-46a5-99bb-e19171874186
+spec:
+  args:
+  - name: baseline-hash
+    value: 6d74cfdc4c
+  - name: canary-hash
+    value: 8475dcf9cc
+  metrics:
+  - consecutiveErrorLimit: 6
+    failureLimit: 0
+    interval: 10s
+    name: canaryjudge
+    provider:
+      web:
+        authentication:
+          oauth2: {}
+          sigv4: {}
+        jsonPath: '{$.verdict}'
+        timeoutSeconds: 20
+        url: http://canaryjudge.default.svc.cluster.local:8090/api/v1/judge?baseline={{args.baseline-hash}}&canary={{args.canary-hash}}&mode=sequential&warmup=30
+    successCondition: result != "fail"
+  terminate: true
+status:
+  completedAt: "2026-10-04T23:22:16Z"
+  dryRunSummary: {}
+  message: Run Terminated
+  metricResults:
+  - consecutiveSuccess: 25
+    count: 25
+    measurements:
+    - finishedAt: "2026-10-04T23:20:46Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:20:46Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:20:56Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:20:56Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:21:06Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:21:06Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:21:16Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:21:16Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:21:26Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:21:26Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:21:36Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:21:36Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:21:46Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:21:46Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:21:56Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:21:56Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:22:06Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:22:06Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:22:16Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:22:16Z"
+      value: '"pass"'
+    name: canaryjudge
+    phase: Successful
+    successful: 25
+  phase: Successful
+  runSummary:
+    count: 1
+    successful: 1
+  startedAt: "2026-10-04T23:18:16Z"

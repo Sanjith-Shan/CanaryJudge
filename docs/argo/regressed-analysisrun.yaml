@@ -1,0 +1,92 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisRun
+metadata:
+  creationTimestamp: "2026-10-04T23:23:09Z"
+  generation: 13
+  name: target-7d77697c94-3-0-canaryjudge
+  namespace: default
+  ownerReferences:
+  - apiVersion: argoproj.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Experiment
+    name: target-7d77697c94-3-0
+    uid: 0f151942-bd6f-49f8-9321-4db1d02e60df
+  resourceVersion: "1357"
+  uid: 181c594a-a831-46ce-b070-42c50b3c1c70
+spec:
+  args:
+  - name: baseline-hash
+    value: 8475dcf9cc
+  - name: canary-hash
+    value: 789fc84745
+  metrics:
+  - consecutiveErrorLimit: 6
+    failureLimit: 0
+    interval: 10s
+    name: canaryjudge
+    provider:
+      web:
+        authentication:
+          oauth2: {}
+          sigv4: {}
+        jsonPath: '{$.verdict}'
+        timeoutSeconds: 20
+        url: http://canaryjudge.default.svc.cluster.local:8090/api/v1/judge?baseline={{args.baseline-hash}}&canary={{args.canary-hash}}&mode=sequential&warmup=30
+    successCondition: result != "fail"
+status:
+  completedAt: "2026-10-04T23:24:59Z"
+  dryRunSummary: {}
+  message: Metric "canaryjudge" assessed Failed due to failed (1) > failureLimit (0)
+  metricResults:
+  - count: 12
+    failed: 1
+    measurements:
+    - finishedAt: "2026-10-04T23:23:29Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:23:29Z"
+      value: '"pending"'
+    - finishedAt: "2026-10-04T23:23:39Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:23:39Z"
+      value: '"pending"'
+    - finishedAt: "2026-10-04T23:23:49Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:23:49Z"
+      value: '"pending"'
+    - finishedAt: "2026-10-04T23:23:59Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:23:59Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:24:09Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:24:09Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:24:19Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:24:19Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:24:29Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:24:29Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:24:39Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:24:39Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:24:49Z"
+      phase: Successful
+      startedAt: "2026-10-04T23:24:49Z"
+      value: '"pass"'
+    - finishedAt: "2026-10-04T23:24:59Z"
+      phase: Failed
+      startedAt: "2026-10-04T23:24:59Z"
+      value: '"fail"'
+    name: canaryjudge
+    phase: Failed
+    successful: 11
+  phase: Failed
+  runSummary:
+    count: 1
+    failed: 1
+  startedAt: "2026-10-04T23:23:09Z"

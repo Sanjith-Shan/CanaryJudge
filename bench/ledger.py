@@ -188,16 +188,17 @@ def main():
     if sim:
         w("## A/A simulation: peeking versus the sequential test (`results/sim_aa.jsonl`)\n")
         w("Synthetic healthy canaries (not live data): per-interval latency for baseline and canary from the same log-normal, with a "
-          "shared load term, and AR(1) noise with autocorrelation phi. One metric, one-sided, alpha 5%. False-alarm rate after a given "
+          "load term shared by both sides (or none), and AR(1) noise with autocorrelation phi. A shared load term makes the unpaired "
+          "Mann-Whitney test conservative (it ignores the pairing); with independent sides it sits at its nominal 5%. One metric, one-sided, alpha 5%. False-alarm rate after a given "
           "number of checks.\n")
         looks = sorted({r["looks"] for r in sim})
-        w("| phi | method | " + " | ".join(f"{l} checks" for l in looks) + " |")
-        w("|---|---|" + "---|" * len(looks))
+        w("| shared load | phi | method | " + " | ".join(f"{l} checks" for l in looks) + " |")
+        w("|---|---|---|" + "---|" * len(looks))
         rows = {}
         for r in sim:
-            rows.setdefault((r["phi"], r["method"]), {})[r["looks"]] = r
-        for (phi, method), d in sorted(rows.items()):
-            w(f"| {phi} | {method} | " + " | ".join(pct(d[l]["rate"], 1) if l in d else "" for l in looks) + " |")
+            rows.setdefault((r.get("load_sd", 0.0), r["phi"], r["method"]), {})[r["looks"]] = r
+        for (ld, phi, method), d in sorted(rows.items()):
+            w(f"| {'yes' if ld else 'no'} | {phi} | {method} | " + " | ".join(pct(d[l]["rate"], 1) if l in d else "" for l in looks) + " |")
         w(f"\n{sim[0]['runs']} runs per cell, seed {sim[0]['seed']}. The fixed row is one test at that horizon (one check).\n")
 
     if trace:

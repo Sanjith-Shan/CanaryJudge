@@ -1,0 +1,31 @@
+Name:            target
+Namespace:       default
+Status:          ◌ Progressing
+Message:         more replicas need to be updated
+Strategy:        Canary
+  Step:          0/3
+  SetWeight:     0
+  ActualWeight:  0
+Images:          canaryjudge:dev (stable, Σ:baseline, Σ:canary)
+Replicas:
+  Desired:       3
+  Current:       3
+  Updated:       0
+  Ready:         3
+  Available:     3
+
+NAME                                                KIND         STATUS         AGE    INFO
+⟳ target                                            Rollout      ◌ Progressing  3m11s  
+├──# revision:2                                                                        
+│  ├──⧉ target-54584c9bd8                           ReplicaSet   • ScaledDown   2m1s   canary
+│  └──Σ target-54584c9bd8-2-0                       Experiment   ◌ Running      2m1s   
+│     ├──⧉ target-54584c9bd8-2-0-baseline           ReplicaSet   ✔ Healthy      2m1s   
+│     │  └──□ target-54584c9bd8-2-0-baseline-mcmg2  Pod          ✔ Running      2m1s   ready:1/1
+│     ├──⧉ target-54584c9bd8-2-0-canary             ReplicaSet   ✔ Healthy      2m1s   
+│     │  └──□ target-54584c9bd8-2-0-canary-cq52s    Pod          ✔ Running      2m1s   ready:1/1
+│     └──α target-54584c9bd8-2-0-canaryjudge        AnalysisRun  ◌ Running      117s   ✔ 12
+└──# revision:1                                                                        
+   └──⧉ target-57b6c58ddb                           ReplicaSet   ✔ Healthy      3m11s  stable
+      ├──□ target-57b6c58ddb-hhqxh                  Pod          ✔ Running      3m11s  ready:1/1
+      ├──□ target-57b6c58ddb-lrdpp                  Pod          ✔ Running      3m11s  ready:1/1
+      └──□ target-57b6c58ddb-rflw2                  Pod          ✔ Running      3m11s  ready:1/1

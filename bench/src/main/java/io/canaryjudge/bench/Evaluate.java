@@ -29,7 +29,8 @@ import java.util.TreeMap;
  *   <li>{@code fixed_mw}: one-sided Mann-Whitney per metric at alpha / m, once on the whole window.</li>
  *   <li>{@code sequential}: the always-valid judge, checked after every interval.</li>
  *   <li>{@code peeking_mw}: {@code fixed_mw} re-run after every interval (naive repeated checks).</li>
- *   <li>{@code peeking_kayenta}: the Kayenta-style judge re-run after every interval, failing on the first Fail.</li>
+ *   <li>{@code peeking_kayenta}: the Kayenta-style judge re-run after every interval from the sixth, stopping at the
+ *       first verdict that is not Pass.</li>
  *   <li>{@code static_flagger}: fixed limits with Flagger's documented defaults (success rate at least 99%,
  *       p99 at most 500 ms), rollback after 5 failed checks.</li>
  *   <li>{@code static_tuned}: fixed limits calibrated on separate healthy runs (worst healthy value + 10%) on
@@ -164,7 +165,7 @@ public final class Evaluate {
 
     static int peekKayenta(CanaryJudge judge, CanaryConfig config, Recording rec, int min, int n) {
         for (int k = min; k <= n; k++)
-            if (judge.judge(config, 95, 75, rec.pairs(config, k)).score().classification().equals("Fail")) return k;
+            if (!judge.judge(config, 95, 75, rec.pairs(config, k)).score().classification().equals("Pass")) return k;
         return -1;
     }
 

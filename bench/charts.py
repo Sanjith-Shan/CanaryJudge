@@ -66,7 +66,7 @@ def detection():
     ax.set_xlabel("canaries stopped within 6 minutes (%)")
     ax.set_title("exp1: injected regressions caught", loc="left")
     ax.grid(axis="y", visible=False)
-    ax.legend(loc="lower right")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.14), ncol=3)
     save(fig, "exp1_detection.png")
 
 
@@ -127,13 +127,14 @@ def simulation():
     fig, axes = plt.subplots(1, len(phis), figsize=(10, 3.8), sharey=True)
     for ax, phi in zip(axes, phis):
         for m, lbl, col in methods:
-            pts = sorted((r["looks"], 100 * r["rate"]) for r in sim if r["phi"] == phi and r["method"] == m)
+            pts = sorted((r["looks"], 100 * r["rate"]) for r in sim
+                         if r["phi"] == phi and r["method"] == m and r.get("load_sd", 0.0) == 0.0)
             if pts:
                 ax.plot([p[0] for p in pts], [p[1] for p in pts], color=col, linewidth=2, marker="o", markersize=4, label=lbl)
         ax.axhline(5, color=INK, linestyle="--", linewidth=1)
         ax.set_xscale("log")
         ax.set_xticks([6, 12, 36, 144], ["6", "12", "36", "144"])
-        ax.set_title(f"autocorrelation {phi}", loc="left", fontsize=10)
+        ax.set_title(f"lag-1 autocorrelation {phi}", loc="left", fontsize=10)
         ax.set_xlabel("checks (10 s intervals)")
     axes[0].set_ylabel("false alarms on A/A (%)")
     axes[0].legend(loc="upper left", fontsize=8)

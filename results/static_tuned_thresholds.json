@@ -1,5 +1,4 @@
 {
-  "calibration_trials" : [ "t020", "t058" ],
   "thresholds" : {
     "name" : "static_tuned",
     "max" : {
@@ -10,5 +9,6 @@
     },
     "min" : { },
     "failLimit" : 5
-  }
+  },
+  "calibration_trials" : [ "t020", "t058" ]
 }
