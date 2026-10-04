@@ -39,7 +39,7 @@ spec:
         - name: target
           image: canaryjudge:dev
           imagePullPolicy: Never
-          command: ["java", "-Xmx200m", "-XX:+UseSerialGC", "-jar", "/app/target-service.jar"]
+          command: ["java", "-Xmx200m", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-jar", "/app/target-service.jar"]
           env:
             - name: CJ_SCOPE
               valueFrom: { fieldRef: { fieldPath: "metadata.labels['rollouts-pod-template-hash']" } }
@@ -47,6 +47,7 @@ spec:
             - { name: CJ_LANE, value: k8s }
             - { name: INJECT_TYPE, value: none }
             - { name: INJECT_SIZE, value: "0" }
+            - { name: DEPLOY_VERSION, value: "1" }
           ports: [{ containerPort: 8080 }]
           readinessProbe:
             httpGet: { path: /actuator/health, port: 8080 }

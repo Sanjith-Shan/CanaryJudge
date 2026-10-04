@@ -1,0 +1,24 @@
+# Grafana with the CanaryJudge dashboard, plus the image renderer used to export it to docs/.
+# docker compose -f deploy/docker-compose.yml -f deploy/grafana/compose.yml up -d
+services:
+  grafana:
+    image: grafana/grafana:13.0.10
+    container_name: cj-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_RENDERING_SERVER_URL: http://cj-renderer:8081/render
+      GF_RENDERING_CALLBACK_URL: http://cj-grafana:3000/
+      GF_SECURITY_ADMIN_PASSWORD: canaryjudge
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["13000:3000"]
+    mem_limit: 400m
+    labels: { project: canaryjudge }
+
+  renderer:
+    image: grafana/grafana-image-renderer:v5.12.5
+    container_name: cj-renderer
+    mem_limit: 700m
+    labels: { project: canaryjudge }

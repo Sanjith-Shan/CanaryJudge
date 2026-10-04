@@ -79,17 +79,17 @@
       }
     },
     {
-      "name": "heap_after_gc",
+      "name": "heap_growth",
       "groups": ["Saturation"],
       "scopeName": "default",
       "query": {
         "type": "prometheus",
         "metricName": "cj_heap_after_gc_bytes",
-        "customInlineTemplate": "PromQL:max(cj_heap_after_gc_bytes{cj_scope=\"${scope}\"})"
+        "customInlineTemplate": "PromQL:max(cj_heap_after_gc_bytes{cj_scope=\"${scope}\"}) - max(cj_heap_after_gc_bytes{cj_scope=\"${scope}\"} offset 10s)"
       },
       "analysisConfigurations": {
-        "canary": { "direction": "increase", "nanStrategy": "remove", "effectSize": { "allowedIncrease": 1.25 } },
-        "canaryjudge": { "sequential": { "type": "mean", "logScale": true, "margin": 1.25 } }
+        "canary": { "direction": "increase", "nanStrategy": "remove" },
+        "canaryjudge": { "sequential": { "type": "mean" } }
       }
     }
   ]
