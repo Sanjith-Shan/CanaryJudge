@@ -67,13 +67,28 @@ Minutes from the start of the measured window until the judge failed the canary,
 
 Over every injected run the sequential judge caught (31 runs): median **1.3 min** to stop the canary, against 6 min for the fixed-horizon judge.
 
+## exp4: agreement with Kayenta (`results/exp4.jsonl`)
+
+Kayenta itself (`us-docker.pkg.dev/spinnaker-community/docker/kayenta:2026.0.4-slim`, unmodified) and CanaryJudge judged the same recorded series, every run at 12, 24, 36 intervals. CanaryJudge was called kayenta-compatible API.
+
+- Per-metric classification: **1,044 of 1,044** agree.
+- Canary verdict (Pass, Marginal, Fail): **174 of 174** agree.
+- Largest score difference: 0.00.
+- Of the compared classifications, 118 were not Pass in Kayenta (so agreement covers failures, not just passes).
+
 ## exp5: live rollouts (`results/exp5.jsonl`)
 
 The rollout controller moves a fresh canary through 1%, 5% and 25% of users (2 minutes each, a fresh baseline at the same share), then promotes it. Users stick to one side by a hash of their id; the share of users who reached the canary is counted by the splitter from the start of the rollout to the end (rollback or promotion).
 
 | regression | judge | rollouts | rolled back | median minutes to rollback | median share of users reached | max share of users reached |
 |---|---|---|---|---|---|---|
+| A/A (no change) | sequential | 1 | 0 |  | 13.62% | 13.62% |
+| latency +10% | sequential | 1 | 0 |  | 13.71% | 13.71% |
 | errors +2% of requests | fixed | 1 | 1 | 4.1 | 3.39% | 3.39% |
+| CPU +4 ms per request | sequential | 1 | 1 | 2.7 | 2.70% | 2.70% |
+
+Sequential judge, every injected regression (2 rollouts): at most **13.7%** of users reached the bad canary before rollback; 1 of 2 rolled back.
+
 Manual 30-minute canary, for comparison (a model, not a measurement): a canary at 5% of users for 30 minutes exposes 5% of users when the regression is caught at the end, and every user when it is missed and promoted. With the miss rates of the tuned static limits from exp1 (the closest thing to a person watching dashboards), the expected share is listed per regression in `results/exp5_manual_model.jsonl`.
 
 ## A/A simulation: peeking versus the sequential test (`results/sim_aa.jsonl`)
@@ -108,4 +123,9 @@ Synthetic healthy canaries (not live data): per-interval latency for baseline an
 | yes | 0.6 | sequential_batched | 0.0% | 0.0% | 0.9% | 2.9% | 5.6% | 7.2% |
 
 2000 runs per cell, seed 20261004. The fixed row is one test at that horizon (one check).
+
+## Argo Rollouts integration (`results/argo.jsonl`)
+
+- 2026-10-04T23:23:05+00:00: Argo Rollouts healthy update (none 0), experiment with a fresh baseline and canary judged by CanaryJudge every 10 s: promoted after 293s, phase Healthy (25 measurements, 0 failed, phase Successful; last verdict pass)
+- 2026-10-04T23:25:07+00:00: Argo Rollouts regressed update (latency 0.5), experiment with a fresh baseline and canary judged by CanaryJudge every 10 s: aborted after 122s (12 measurements, 1 failed, phase Failed; last verdict fail)
 
