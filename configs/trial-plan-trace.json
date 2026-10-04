@@ -1,0 +1,17 @@
+{
+  "prefix": "tr",
+  "seed": 1995,
+  "laneRps": 40,
+  "minRateShare": 0.15,
+  "warmupSeconds": 90,
+  "windowSeconds": 360,
+  "stepSeconds": 10,
+  "heap": "224m",
+  "memLimit": "460m",
+  "note": "load generator replays configs/traces/nasa-jul95-per-minute.csv from 1995-07-03 09:00 (offset 3420), one trace minute per 10 s",
+  "conditions": [
+    { "scenario": "aa", "type": "none", "size": 0, "repeats": 9 },
+    { "scenario": "latency_10", "type": "latency", "size": 0.10, "repeats": 6 },
+    { "scenario": "errors_2", "type": "errors", "size": 0.02, "repeats": 3 }
+  ]
+}

@@ -184,11 +184,18 @@ public final class TrialRunner {
         String cScope() { return trial.id() + "-canary"; }
     }
 
+    /**
+     * Waits (up to 15 minutes) while the host is busy with other jobs: Windows CPU above the limit, or less than
+     * {@code minAvailableMb} of memory left in the shared WSL VM (a batch of three lanes needs about 2.2 GB).
+     */
     void waitForQuietHost() throws InterruptedException {
+        long minMb = plan.path("minAvailableMb").asLong(2600);
         for (int i = 0; i < 30; i++) {
             Double cpu = Machine.windowsCpu();
-            if (cpu == null || cpu <= maxHostCpu) return;
-            System.out.printf("host CPU %.0f%% > %.0f%%, waiting%n", cpu, maxHostCpu);
+            long availMb = Machine.availableMb();
+            boolean cpuOk = cpu == null || cpu <= maxHostCpu, memOk = availMb == 0 || availMb >= minMb;
+            if (cpuOk && memOk) return;
+            System.out.printf("host busy (CPU %s%%, %d MB available in WSL), waiting%n", cpu, availMb);
             Thread.sleep(30_000);
         }
     }

@@ -66,6 +66,9 @@ public final class Machine {
         return "unknown";
     }
 
+    /** MemAvailable of the VM in MB (0 if unknown). */
+    public static long availableMb() { return memAvailableKb() / 1024; }
+
     private static long memTotalKb() { return meminfo("MemTotal"); }
 
     private static long memAvailableKb() { return meminfo("MemAvailable"); }

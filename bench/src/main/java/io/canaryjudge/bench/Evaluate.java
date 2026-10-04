@@ -45,7 +45,8 @@ public final class Evaluate {
         Path outDir = Path.of(a.getOrDefault("out-dir", "results"));
         int points = Integer.parseInt(a.getOrDefault("points", "36"));
         double r = Double.parseDouble(a.getOrDefault("r", Double.toString(SequentialJudge.DEFAULT_R)));
-        List<Recording> calibration = all.stream().filter(x -> x.scenario().equals("calibration")).toList();
+        List<Recording> calibration = (a.containsKey("calibration") ? Recordings.read(Path.of(a.get("calibration"))) : all)
+                .stream().filter(x -> x.scenario().equals("calibration")).toList();
         List<Recording> recs = all.stream().filter(x -> !x.scenario().equals("calibration")).toList();
         StaticThresholds flagger = new StaticThresholds("static_flagger", Map.of("latency_p99", 0.5, "error_rate", 0.01), Map.of(), 5);
         StaticThresholds tuned = tuned(calibration, points);
