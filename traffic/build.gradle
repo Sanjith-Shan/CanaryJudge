@@ -7,6 +7,7 @@ dependencies {
 
 jar {
     archiveFileName = 'traffic.jar'
+    dependsOn configurations.runtimeClasspath
     manifest { attributes 'Main-Class': 'io.canaryjudge.traffic.Main' }
     from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
