@@ -40,6 +40,17 @@ def ci(j):
     return f"[{pct(lo)} to {pct(hi)}]"
 
 
+def wilson(k, n):
+    if n == 0:
+        return 0.0, 1.0
+    z = 1.959963984540054
+    p = k / n
+    d = 1 + z * z / n
+    c = (p + z * z / (2 * n)) / d
+    h = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / d
+    return max(0.0, c - h), min(1.0, c + h)
+
+
 def fmt_min(x):
     return "" if x is None else f"{x:.1f}"
 
@@ -123,6 +134,21 @@ def main():
         if ac:
             w("\nMean lag-1 autocorrelation of the per-interval differences (canary minus baseline) in these runs; the sequential "
               "t-test assumes 0: " + ", ".join(f"{k} {v:+.2f}" for k, v in ac.items()) + ".\n")
+
+    native = load("native/exp2.jsonl")
+    if native and exp2:
+        r2, rn = exp2[0], native[0]
+        w("### exp2, second set: A/A canaries run natively on Windows (`results/native/exp2.jsonl`)\n")
+        w(f"{rn['runs']} more healthy canaries, from `results/trials_native_aa.jsonl`, on the same mini PC as native Windows processes "
+          "(no WSL, no Docker), while other jobs kept the host CPU near 100%. Same judges, same config.\n")
+        w("| judge | false alarms, native set | both sets together | 95% interval, both sets |")
+        w("|---|---|---|---|")
+        for j, lbl in JUDGES:
+            k = r2[j]["failed"] + rn[j]["failed"]
+            n = r2["runs"] + rn["runs"]
+            lo, hi = wilson(k, n)
+            w(f"| {lbl} | {rn[j]['failed']} of {rn['runs']} | **{k} of {n}** ({pct(k / n, 1)}) | [{pct(lo)} to {pct(hi)}] |")
+        w("")
 
     if exp3:
         w("## exp3: time to stop a bad canary (`results/exp3.jsonl`)\n")
@@ -214,7 +240,10 @@ def main():
     if trace:
         w("## Real-shaped traffic (`results/trace_judgements_summary.jsonl`)\n")
         w("The same judges on canaries run under a replay of the NASA-KSC web server's request rate (July 1995, per minute, "
-          "one trace minute per 10 s of wall time).\n")
+          "from 3 July 09:00, one trace minute per 10 s of wall time, 40 requests per second per lane at the trace's mean), run "
+          "natively on Windows on the same mini PC from `results/trace_trials.jsonl`. 11 of 12 planned runs were accepted; the "
+          "rest of the attempts were rejected by the traffic check while other jobs held the host CPU near 100% "
+          "(`results/trace_trials.log`). Too few runs for rates; it shows the judges behave the same under a real traffic shape.\n")
         w("| scenario | runs | " + " | ".join(lbl for _, lbl in JUDGES[:3]) + " |")
         w("|---|---|" + "---|" * 3)
         for r in trace:

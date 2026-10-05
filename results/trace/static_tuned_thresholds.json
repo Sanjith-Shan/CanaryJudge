@@ -1,0 +1,14 @@
+{
+  "thresholds" : {
+    "name" : "static_tuned",
+    "max" : {
+      "latency_p99" : 0.9714679127450017,
+      "error_rate" : 0.01,
+      "cpu" : 0.08901734104046244,
+      "heap_after_gc" : 1.0425303680000001E8
+    },
+    "min" : { },
+    "failLimit" : 5
+  },
+  "calibration_trials" : [ "t020", "t058" ]
+}

@@ -134,6 +134,16 @@ Synthetic healthy canaries (not live data): per-interval latency for baseline an
 
 2000 runs per cell, seed 20261004. The fixed row is one test at that horizon (one check).
 
+## Real-shaped traffic (`results/trace_judgements_summary.jsonl`)
+
+The same judges on canaries run under a replay of the NASA-KSC web server's request rate (July 1995, per minute, from 3 July 09:00, one trace minute per 10 s of wall time, 40 requests per second per lane at the trace's mean), run natively on Windows on the same mini PC from `results/trace_trials.jsonl`. 11 of 12 planned runs were accepted; the rest of the attempts were rejected by the traffic check while other jobs held the host CPU near 100% (`results/trace_trials.log`). Too few runs for rates; it shows the judges behave the same under a real traffic shape.
+
+| scenario | runs | Kayenta-style judge, once at 6 min | sequential judge, every 10 s | Mann-Whitney at alpha/m, once at 6 min |
+|---|---|---|---|---|
+| A/A (no change) | 6 | 0% (0) | 0% (0) | 17% (1) |
+| errors +2% of requests | 1 | 100% (1) | 100% (1) | 100% (1) |
+| latency +10% | 4 | 50% (2) | 100% (4) | 100% (4) |
+
 ## Argo Rollouts integration (`results/argo.jsonl`)
 
 - 2026-10-04T23:23:05+00:00: Argo Rollouts healthy update (none 0), experiment with a fresh baseline and canary judged by CanaryJudge every 10 s: promoted after 293s, phase Healthy (25 measurements, 0 failed, phase Successful; last verdict pass)

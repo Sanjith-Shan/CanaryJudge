@@ -8,8 +8,14 @@
   "heap": "224m",
   "memLimit": "460m",
   "minAvailableMb": 0,
-  "note": "second A/A set, run natively on Windows (no WSL, no Docker) on the same mini PC",
+  "note": "second A/A set, run natively on Windows (no WSL, no Docker) on the same mini PC; up to 10% of intervals may miss a scrape (the host ran near 100% CPU from other jobs)",
   "conditions": [
-    { "scenario": "aa", "type": "none", "size": 0, "repeats": 24 }
-  ]
+    {
+      "scenario": "aa",
+      "type": "none",
+      "size": 0,
+      "repeats": 24
+    }
+  ],
+  "maxMissingShare": 0.1
 }

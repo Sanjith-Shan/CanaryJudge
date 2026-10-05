@@ -259,7 +259,8 @@ public final class TrialRunner {
         meta.put("load_before", loadBefore);
         meta.put("load_after", Machine.load());
         Recording rec = new Recording(t.id(), t.condition().scenario(), cond, startSec * 1000, step * 1000, series, meta);
-        String problem = trafficProblem(rec, plan.path("laneRps").asDouble(80) / 2, plan.path("minRateShare").asDouble(0.6));
+        String problem = trafficProblem(rec, plan.path("laneRps").asDouble(80) / 2, plan.path("minRateShare").asDouble(0.6),
+                plan.path("maxMissingShare").asDouble(0.05));
         synchronized (TrialRunner.class) {
             if (problem == null) {
                 Files.writeString(out, JSON.writeValueAsString(rec) + "\n", StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
@@ -278,9 +279,9 @@ public final class TrialRunner {
     /**
      * A run only counts if both sides got their share of traffic for the whole window: every interval's
      * request rate must be at least minShare (60% by default) of the expected per-instance rate, and at most 5% of the
-     * intervals may be missing (a missed scrape).
+     * intervals may be missing (a missed scrape; the plan can raise that with maxMissingShare).
      */
-    static String trafficProblem(Recording rec, double expectedPerInstance, double minShare) {
+    static String trafficProblem(Recording rec, double expectedPerInstance, double minShare, double maxMissingShare) {
         Recording.Pair p = rec.series().get("request_rate");
         if (p == null) return null;
         for (double[] side : new double[][]{p.control(), p.experiment()}) {
@@ -292,7 +293,7 @@ public final class TrialRunner {
                     return String.format(java.util.Locale.ROOT, "request rate %.1f/s in an interval, expected about %.0f/s", v, expectedPerInstance);
                 }
             }
-            if (missing > Math.max(1, side.length / 20))
+            if (missing > Math.max(1, (int) Math.floor(side.length * maxMissingShare)))
                 return missing + " intervals without data";
         }
         return null;
