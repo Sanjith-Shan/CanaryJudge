@@ -81,7 +81,7 @@ Checking a fixed-horizon test repeatedly while a canary runs and stopping at the
 to cross the line. The sequential judge is built so that it can be checked after every interval and still
 fail a healthy canary with probability at most alpha (5%) over the whole run.
 
-* **Scale metrics (latency quantiles, CPU, heap).** A sequential t-test on the per-interval differences
+* **Scale metrics (latency quantiles, CPU, heap growth).** A sequential t-test on the per-interval differences
   (log differences for latency, so a 10% slowdown is the same shift at any latency). The evidence is the
   Bayes factor with a normal prior on the standardized effect and the right-Haar prior on the noise scale,
   which has a closed form; with that scale prior it is a test martingale under the null, so Ville's
@@ -94,6 +94,15 @@ fail a healthy canary with probability at most alpha (5%) over the whole run.
   from 1.1 to 10, is an e-process: it reaches 1/alpha on a healthy canary with probability at most alpha.
 * **Many metrics.** Each of the m metrics runs at alpha / m, so the chance that any of them ever fires is at
   most alpha. A metric only fails in its harmful direction.
+
+## Memory
+
+Heap level turned out not to be usable as a canary metric. Plain heap use saws with every collection; heap
+right after a collection still differed by up to 30% between two identical JVMs, because the level is set by
+whatever start-up happens to promote into the old generation. A leak shows up as growth, so the config judges
+`heap_growth`, the change in heap-after-GC over each 10-second interval (`x - x offset 10s` in PromQL). Every
+target runs one full collection when it is ready so both sides start clean. The cost: a leak must grow fast
+enough to show within the window. Bugs 2, 5 and 6 in `BUG_LOG.md` are the path to this.
 
 ## Rollout controller
 
@@ -110,6 +119,19 @@ Live trials record every metric of the config for both sides from Prometheus int
 one run per line, with the machine and the host load before and after. All judges then replay the same
 recordings (`bench evaluate`), so every judge sees exactly the same numbers. Kayenta judges the same
 recordings through its own API (`bench kayenta-diff`). Rollouts (exp5) are live end to end.
+
+The experiments started in Docker inside WSL2 on a shared mini PC. When WSL on that box began hanging under
+load, the remaining live work (rollouts, the trace replay, a second A/A set) moved to native Windows processes
+on the same machine: `scripts/native_stack.ps1` runs Prometheus's Windows binary, the splitter, the load
+generator and the server, and `bench --launcher process` starts targets as plain JVMs on loopback ports. The
+differential test against Kayenta and the Argo Rollouts demo need Docker, so they ran on GitHub Actions runners
+(`.github/workflows/kayenta-diff.yml`, `argo-demo.yml`). Every row names its machine.
+
+**Real-shaped traffic.** The load generator can follow a recorded request-rate shape: `configs/traces/` holds
+per-minute request counts of the NASA Kennedy Space Center web server for 1 to 7 July 1995 (Internet Traffic
+Archive, NASA-HTTP, collected by Jim Dumoulin, contributed by Martin Arlitt and Carey Williamson; "the traces may
+be freely redistributed"). Only counts are kept, no hosts or URLs, as the archive asks. One trace minute plays per
+10 seconds of wall time.
 
 ## Credits
 
@@ -131,9 +153,9 @@ recordings through its own API (`bench kayenta-diff`). Rollouts (exp5) are live 
 * **Sequential testing and always-valid inference.** Wald's sequential probability ratio test; Robbins'
   mixture martingales; Johari, Koomen, Pekelis and Walsh, "Peeking at A/B tests" (KDD 2017) and "Always valid
   inference" (Operations Research 2022) for the mixture SPRT in experimentation; Gonen, Johnson, Lu and
-  Westfall, "The Bayesian two-sample t test" (2005), for the closed-form Bayes factor with a normal prior on the effect; Perez-Ortiz, Lardy,
-  de Heide and Grunwald, "E-statistics, group invariance and anytime valid testing" (2022)
-  for why that Bayes factor is a test martingale; Ramdas, Grunwald, Vovk and Shafer, "Game-theoretic
+  Westfall, "The Bayesian two-sample t test" (2005), for the closed-form Bayes factor with a normal prior on
+  the effect; Perez-Ortiz, Lardy, de Heide and Grunwald, "E-statistics, group invariance and anytime valid
+  testing" (2022), for why that Bayes factor is a test martingale; Ramdas, Grunwald, Vovk and Shafer, "Game-theoretic
   statistics and safe anytime-valid inference" (Statistical Science 2023); Howard, Ramdas, McAuliffe and
   Sekhon, "Time-uniform, nonparametric, nonasymptotic confidence sequences" (Annals of Statistics 2021).
 * **Netflix Technology Blog, "Sequential A/B Testing Keeps the World Streaming Netflix" (2024, parts 1 and

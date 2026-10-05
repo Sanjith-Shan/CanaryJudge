@@ -15,7 +15,10 @@ release, compare it with the old one on live metrics, and roll back if it is wor
 2. **How long do you wait?** Waiting longer gives more evidence but exposes more users to a bad release.
    Checking early and often is natural, and it quietly breaks the statistics.
 
-{{RESULTS_SUMMARY}}
+In short: on 38 live canaries with injected regressions, the sequential judge stopped 82% of them, in a median of
+1.3 minutes against the 6 minutes a fixed-length check waits, and raised {{AA_SHORT}} false alarms on healthy
+canaries. The fixed-horizon judge, written from Kayenta's documentation, agrees with Kayenta itself on all 1,044
+metric classifications it was compared on. Static limits, the most common alternative, caught 18% to 29%.
 
 ## How the judge decides
 
@@ -41,7 +44,11 @@ sum. A metric marked critical (errors, here) fails the whole canary outright. A 
 I wrote the judge in Java from Kayenta's documentation, then checked it against Kayenta itself: Kayenta's own
 image judges the same recorded series through its API, and every classification is compared.
 
-{{EXP4}}
+Kayenta judged the 58 recorded runs, each at three window lengths (2, 4 and 6 minutes), through its own
+`/judges/judge` endpoint, and CanaryJudge judged the same series through its Kayenta-compatible API. All 1,044 metric
+classifications and all 174 canary verdicts matched, and the scores were identical. 118 of those classifications
+were not Pass, so the agreement covers failures, not just the easy passes. The one place I deliberately differ,
+finding the confidence-interval ends exactly instead of with a numeric root finder, never changed a verdict.
 
 ## Why start the baseline with the canary
 
@@ -64,7 +71,12 @@ A canary is watched while it runs. The natural thing is to run the test every in
 says the canary is worse. That is peeking, and it inflates false alarms: a test at 5% is a 5% chance of a false
 alarm *each time it is run*, and noise has many chances to cross the line.
 
-{{SIM}}
+A simulation makes the size of the problem concrete: 2,000 healthy canaries per setting, one metric,
+alpha 5%. A single Mann-Whitney test at the end raises a false alarm 5.1% of the time, as it should. The same test
+re-run after every 10-second interval raises one 13% of the time after 12 checks and 28.5% after 144. The
+sequential test, checked just as often, stays at 1.4%.
+
+![Peeking against the sequential test](sim_peeking.png)
 
 The sequential judge is built to be checked after every interval. For latency, CPU and memory it runs a
 sequential t-test on the per-interval differences (canary minus baseline, on a log scale for latency). The
@@ -80,17 +92,52 @@ on live data.
 
 ## What the measurements say
 
-{{EXP1}}
+**Detection.** 38 live canaries carried one of eleven regressions. The sequential judge stopped 82% within the
+6-minute window, and 93% once the two smallest latency regressions are left out; the Kayenta-style judge stopped 74%
+(86%). The sequential judge caught every error-rate and CPU regression; the Kayenta-style judge missed one of seven
++0.5% error runs. Latency +25% and +50% were always caught, +10% by the sequential judge every time and by the
+Kayenta-style judge 2 of 3 times, +5% in 4 of 5 and 3 of 5 runs, and +2% never. Static limits did far worse: Flagger's defaults (p99 under 500 ms, success rate over 99%) never fired on a
+latency regression, because this service's p99 is about 70 ms, and limits tuned on healthy runs caught 29% overall.
+A fixed limit only sees a canary that crosses an absolute line; a comparison with a baseline sees a canary that is
+worse than it should be.
 
-{{EXP2}}
+![Regressions caught](exp1_detection.png)
 
-{{EXP3}}
+**False alarms.** {{AA_PARA}} Re-running the Mann-Whitney test every interval, on the same healthy runs, raised
+3 false alarms in 18. The per-interval differences turned out to be close to independent for latency (lag-1
+autocorrelation between -0.03 and +0.04), which is why the sequential guarantee held on live data; for memory
+growth it was -0.41, which errs on the safe side.
 
-{{EXP5}}
+**Time.** Over the runs it caught, the sequential judge stopped the canary in a median of 1.3 minutes: 0.4 minutes
+for 2% extra errors, about 1.2 for +25% and +50% latency and +4 ms of CPU per request, 2.2 and 3.3 minutes for +5% and
++10% latency. The fixed-horizon judge always waits the full 6.
+
+![Time to stop a bad canary](exp3_time_to_detect.png)
+
+**Rollouts.** The controller moved fresh canaries through 1%, 5% and 25% of users, 2 minutes per step, with users
+pinned to a side by a hash of their id. With the sequential judge, every latency (+50%), error and CPU regression was
+rolled back after at most 3.1% of users had reached the canary, a median of 2.8 minutes in. The 4 KB-per-request
+leak was caught once at the 25% step (14.4% of users) and missed once. A +10% latency regression was missed in all
+three rollouts: at 1% and 5% of 200 requests per second, two minutes is not enough evidence. All four healthy
+rollouts were promoted. For comparison, a manual canary at 5% for 30 minutes exposes 5% of users when it is
+caught and everyone when it is missed.
 
 ## What lost, and why
 
-{{LOST}}
+* **Small regressions.** +2% latency was never caught and +5% only sometimes. On a shared 2-vCPU box the
+  per-interval noise is larger than that; a longer window or per-request latency data would be needed.
+* **Low-traffic steps.** The rollout's 1% and 5% steps carry about 2 and 10 requests per second; a +10% latency
+  regression slipped through all three times. Longer steps, or a higher minimum traffic share for analysis,
+  would fix it at the cost of exposure.
+* **Memory.** Heap level is not a canary metric: identical JVMs differed by 30% depending on what start-up promoted
+  into the old generation. Judging heap growth per interval works, but only for leaks fast enough to show in a few
+  minutes; the 1 KB-per-request leak was caught two times in three.
+* **Autocorrelation.** The sequential t-test assumes independent intervals. In simulation, lag-1 autocorrelation of
+  0.3 lifts its false-alarm rate to 8.6% after 144 checks; averaging three intervals per step brings it to 2.6%.
+  The live latency series were close to independent, so it held here, but a production version should batch.
+* **The box.** Halfway through, WSL on the shared mini PC started hanging under load and had to be restarted
+  repeatedly (it took another project's runs down with it, too). The rest of the live work ran as native Windows
+  processes on the same machine, and two compute-only steps ran on GitHub Actions. Each results row says where.
 
 ## How it was measured
 

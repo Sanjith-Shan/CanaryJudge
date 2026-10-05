@@ -277,16 +277,23 @@ public final class TrialRunner {
 
     /**
      * A run only counts if both sides got their share of traffic for the whole window: every interval's
-     * request rate must be present and at least minShare (60% by default) of the expected per-instance rate.
+     * request rate must be at least minShare (60% by default) of the expected per-instance rate, and at most 5% of the
+     * intervals may be missing (a missed scrape).
      */
     static String trafficProblem(Recording rec, double expectedPerInstance, double minShare) {
         Recording.Pair p = rec.series().get("request_rate");
         if (p == null) return null;
         for (double[] side : new double[][]{p.control(), p.experiment()}) {
+            int missing = 0;
             for (double v : side) {
-                if (Double.isNaN(v) || v < minShare * expectedPerInstance)
+                if (Double.isNaN(v)) {
+                    missing++; // a missed scrape; judges drop NaN intervals, a few are tolerable
+                } else if (v < minShare * expectedPerInstance) {
                     return String.format(java.util.Locale.ROOT, "request rate %.1f/s in an interval, expected about %.0f/s", v, expectedPerInstance);
+                }
             }
+            if (missing > Math.max(1, side.length / 20))
+                return missing + " intervals without data";
         }
         return null;
     }
