@@ -6,7 +6,7 @@ Machine and load fields are ignored (they describe where the rows were made); ev
 import json
 import sys
 
-IGNORE = {"machine", "load_range"}
+IGNORE = {"machine", "evaluated_on", "load_range"}
 
 
 def rows(path):

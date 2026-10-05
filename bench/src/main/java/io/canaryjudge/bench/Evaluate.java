@@ -121,7 +121,7 @@ public final class Evaluate {
                 js.put("p90_minutes_to_fail", mins.length == 0 ? null : Descriptive.percentile(mins, 90));
                 s.put(j, js);
             }
-            s.put("machine", machine);
+            s.put("evaluated_on", machine);
             s.put("load_range", loadRange(rows));
             String line = TrialRunner.JSON.writeValueAsString(s) + "\n";
             if (aa) {
@@ -143,7 +143,7 @@ public final class Evaluate {
                 t.put("fixed_horizon_kayenta_style", s.get("kayenta_style"));
                 t.put("fixed_horizon_mw", s.get("fixed_mw"));
                 t.put("sequential", s.get("sequential"));
-                t.put("machine", machine);
+                t.put("evaluated_on", machine);
                 exp3.append(TrialRunner.JSON.writeValueAsString(t)).append('\n');
             }
         }
