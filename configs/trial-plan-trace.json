@@ -28,5 +28,6 @@
       "size": 0.02,
       "repeats": 2
     }
-  ]
+  ],
+  "minAvailableMb": 0
 }

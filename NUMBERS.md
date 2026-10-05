@@ -69,7 +69,7 @@ Over every injected run the sequential judge caught (31 runs): median **1.3 min*
 
 ## exp4: agreement with Kayenta (`results/exp4.jsonl`)
 
-Kayenta itself (`us-docker.pkg.dev/spinnaker-community/docker/kayenta:2026.0.4-slim`, unmodified) and CanaryJudge judged the same recorded series, every run at 12, 24, 36 intervals. CanaryJudge was called kayenta-compatible API.
+Kayenta itself (`us-docker.pkg.dev/spinnaker-community/docker/kayenta:2026.0.4-slim`, unmodified) and CanaryJudge judged the same recorded series, every run at 12, 24, 36 intervals (174 judgments of 58 runs). CanaryJudge was called through its Kayenta-compatible API, and again in process (`results/exp4_inprocess.jsonl`, the same result). This ran on a GitHub Actions runner (Linux, ubuntu24), because Docker on the mini PC was unavailable by then (BUG_LOG #9); the judgments are deterministic, so the machine does not change them.
 
 - Per-metric classification: **1,044 of 1,044** agree.
 - Canary verdict (Pass, Marginal, Fail): **174 of 174** agree.
@@ -78,16 +78,26 @@ Kayenta itself (`us-docker.pkg.dev/spinnaker-community/docker/kayenta:2026.0.4-s
 
 ## exp5: live rollouts (`results/exp5.jsonl`)
 
-The rollout controller moves a fresh canary through 1%, 5% and 25% of users (2 minutes each, a fresh baseline at the same share), then promotes it. Users stick to one side by a hash of their id; the share of users who reached the canary is counted by the splitter from the start of the rollout to the end (rollback or promotion).
+The rollout controller moves a fresh canary through 1%, 5% and 25% of users (2 minutes each, a fresh baseline at the same share), then promotes it. Users stick to one side by a hash of their id; the share of users who reached the canary is counted by the splitter from the start of the rollout to the end (rollback or promotion). These ran as native Windows processes on the same mini PC (Prometheus's Windows binary, every service a plain JVM on 127.0.0.1), because Docker in WSL had become unusable (BUG_LOG #9). The load generator sends 200 requests per second to the rollout lane.
 
 | regression | judge | rollouts | rolled back | median minutes to rollback | median share of users reached | max share of users reached |
 |---|---|---|---|---|---|---|
-| A/A (no change) | sequential | 1 | 0 |  | 13.62% | 13.62% |
-| latency +10% | sequential | 1 | 0 |  | 13.71% | 13.71% |
+| A/A (no change) | sequential | 3 | 0 |  | 13.47% | 13.62% |
+| A/A (no change) | fixed | 1 | 0 |  | 14.14% | 14.14% |
+| latency +10% | sequential | 2 | 0 |  | 13.65% | 13.71% |
+| latency +10% | fixed | 1 | 0 |  | 13.98% | 13.98% |
+| latency +50% | sequential | 2 | 2 | 2.8 | 2.35% | 2.78% |
+| latency +50% | fixed | 1 | 1 | 4.3 | 3.64% | 3.64% |
+| errors +2% of requests | sequential | 2 | 2 | 3.1 | 2.66% | 3.13% |
 | errors +2% of requests | fixed | 1 | 1 | 4.1 | 3.39% | 3.39% |
-| CPU +4 ms per request | sequential | 1 | 1 | 2.7 | 2.70% | 2.70% |
+| leak 4 KB per request | sequential | 2 | 1 | 6.2 | 14.19% | 14.40% |
+| leak 4 KB per request | fixed | 1 | 1 | 2.1 | 2.88% | 2.88% |
+| CPU +4 ms per request | sequential | 2 | 2 | 2.8 | 2.66% | 2.70% |
+| CPU +4 ms per request | fixed | 1 | 1 | 4.2 | 3.77% | 3.77% |
 
-Sequential judge, every injected regression (2 rollouts): at most **13.7%** of users reached the bad canary before rollback; 1 of 2 rolled back.
+Sequential judge, latency, error and CPU regressions it rolled back (6 rollouts): at most **3.1%** of users reached the canary, median 2.8 minutes to rollback.
+
+Sequential judge, every injected regression (10 rollouts): at most **14.4%** of users reached the bad canary before rollback; 7 of 10 rolled back.
 
 Manual 30-minute canary, for comparison (a model, not a measurement): a canary at 5% of users for 30 minutes exposes 5% of users when the regression is caught at the end, and every user when it is missed and promoted. With the miss rates of the tuned static limits from exp1 (the closest thing to a person watching dashboards), the expected share is listed per regression in `results/exp5_manual_model.jsonl`.
 

@@ -151,7 +151,10 @@ def main():
             s = summ[-1]
             w("## exp4: agreement with Kayenta (`results/exp4.jsonl`)\n")
             w(f"Kayenta itself (`{s['kayenta_image']}`, unmodified) and CanaryJudge judged the same recorded series, every run at "
-              f"{', '.join(str(x) for x in s['windows'])} intervals. CanaryJudge was called {s['canaryjudge_via']}.\n")
+              f"{', '.join(str(x) for x in s['windows'])} intervals ({s['judgements']} judgments of {s['runs']} runs). CanaryJudge "
+              f"was called through its Kayenta-compatible API, and again in process (`results/exp4_inprocess.jsonl`, the same "
+              f"result). This ran on a {s['machine']['host']}, because Docker on the mini PC was unavailable by then "
+              f"(BUG_LOG #9); the judgments are deterministic, so the machine does not change them.\n")
             w(f"- Per-metric classification: **{s['metric_verdicts_agree']:,} of {s['metric_verdicts_compared']:,}** agree.")
             w(f"- Canary verdict (Pass, Marginal, Fail): **{s['canary_verdicts_agree']} of {s['judgements']}** agree.")
             w(f"- Largest score difference: {s['max_score_diff']:.2f}.")
@@ -164,7 +167,9 @@ def main():
         w("## exp5: live rollouts (`results/exp5.jsonl`)\n")
         w("The rollout controller moves a fresh canary through 1%, 5% and 25% of users (2 minutes each, a fresh baseline at the same "
           "share), then promotes it. Users stick to one side by a hash of their id; the share of users who reached the canary is "
-          "counted by the splitter from the start of the rollout to the end (rollback or promotion).\n")
+          "counted by the splitter from the start of the rollout to the end (rollback or promotion). These ran as native Windows "
+          "processes on the same mini PC (Prometheus's Windows binary, every service a plain JVM on 127.0.0.1), because Docker in "
+          "WSL had become unusable (BUG_LOG #9). The load generator sends 200 requests per second to the rollout lane.\n")
         w("| regression | judge | rollouts | rolled back | median minutes to rollback | median share of users reached | max share of users reached |")
         w("|---|---|---|---|---|---|---|")
         groups = {}
@@ -177,6 +182,11 @@ def main():
             w(f"| {LABEL.get(s, s)} | {mode} | {len(rs)} | {len(rb)} | {fmt_min(statistics.median(mins)) if mins else ''} | "
               f"{pct(statistics.median(shares), 2)} | {pct(max(shares), 2)} |")
         bad = [r for r in exp5 if r["scenario"] != "aa" and r["mode"] == "sequential"]
+        fast = [r for r in bad if r["status"] == "rolled_back" and r["scenario"].split("_")[0] in ("latency", "errors", "cpu")]
+        if fast:
+            w(f"\nSequential judge, latency, error and CPU regressions it rolled back ({len(fast)} rollouts): at most "
+              f"**{pct(max(r['canary_user_share'] for r in fast), 1)}** of users reached the canary, median "
+              f"{statistics.median(r['seconds'] for r in fast) / 60:.1f} minutes to rollback.")
         if bad:
             w(f"\nSequential judge, every injected regression ({len(bad)} rollouts): at most **{pct(max(r['canary_user_share'] for r in bad), 1)}** "
               f"of users reached the bad canary before rollback; {sum(r['status'] == 'rolled_back' for r in bad)} of {len(bad)} rolled back.\n")

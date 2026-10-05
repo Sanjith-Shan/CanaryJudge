@@ -1,0 +1,15 @@
+{
+  "prefix": "na",
+  "seed": 77,
+  "laneRps": 80,
+  "warmupSeconds": 90,
+  "windowSeconds": 360,
+  "stepSeconds": 10,
+  "heap": "224m",
+  "memLimit": "460m",
+  "minAvailableMb": 0,
+  "note": "second A/A set, run natively on Windows (no WSL, no Docker) on the same mini PC",
+  "conditions": [
+    { "scenario": "aa", "type": "none", "size": 0, "repeats": 24 }
+  ]
+}
