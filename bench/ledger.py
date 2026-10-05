@@ -135,6 +135,21 @@ def main():
             w("\nMean lag-1 autocorrelation of the per-interval differences (canary minus baseline) in these runs; the sequential "
               "t-test assumes 0: " + ", ".join(f"{k} {v:+.2f}" for k, v in ac.items()) + ".\n")
 
+    trace_aa = [r for r in load("trace/exp2.jsonl") if r["scenario"] == "aa"]
+    if trace_aa and exp2:
+        r2, rt = exp2[0], trace_aa[0]
+        w("### All live A/A canaries together\n")
+        w(f"The {r2['runs']} A/A runs above plus the {rt['runs']} A/A runs under the replayed NASA trace (native Windows, "
+          "`results/trace/exp2.jsonl`). A second native A/A set was attempted and abandoned: 0 of 6 attempts passed the traffic "
+          "check while other jobs held the host CPU near 100% (`results/trials_native_aa.log`).\n")
+        w("| judge | false alarms | rate | 95% interval |")
+        w("|---|---|---|---|")
+        for j, lbl in JUDGES:
+            k, n = r2[j]["failed"] + rt[j]["failed"], r2["runs"] + rt["runs"]
+            lo, hi = wilson(k, n)
+            w(f"| {lbl} | **{k} of {n}** | {pct(k / n, 1)} | [{pct(lo)} to {pct(hi)}] |")
+        w("")
+
     native = load("native/exp2.jsonl")
     if native and exp2:
         r2, rn = exp2[0], native[0]

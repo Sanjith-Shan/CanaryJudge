@@ -47,6 +47,20 @@ Without the two smallest latency regressions (+2%, +5%): Kayenta-style judge, on
 
 Mean lag-1 autocorrelation of the per-interval differences (canary minus baseline) in these runs; the sequential t-test assumes 0: latency_p50 -0.03, latency_p90 -0.03, latency_p99 +0.04, error_rate -0.05, cpu -0.06, heap_growth -0.41.
 
+### All live A/A canaries together
+
+The 18 A/A runs above plus the 6 A/A runs under the replayed NASA trace (native Windows, `results/trace/exp2.jsonl`). A second native A/A set was attempted and abandoned: 0 of 6 attempts passed the traffic check while other jobs held the host CPU near 100% (`results/trials_native_aa.log`).
+
+| judge | false alarms | rate | 95% interval |
+|---|---|---|---|
+| Kayenta-style judge, once at 6 min | **0 of 24** | 0.0% | [0% to 14%] |
+| sequential judge, every 10 s | **0 of 24** | 0.0% | [0% to 14%] |
+| Mann-Whitney at alpha/m, once at 6 min | **1 of 24** | 4.2% | [1% to 20%] |
+| same, re-checked every 10 s (peeking) | **4 of 24** | 16.7% | [7% to 36%] |
+| Kayenta-style judge re-checked every 10 s | **0 of 24** | 0.0% | [0% to 14%] |
+| static limits, Flagger defaults | **3 of 24** | 12.5% | [4% to 31%] |
+| static limits, tuned on healthy runs | **1 of 24** | 4.2% | [1% to 20%] |
+
 ## exp3: time to stop a bad canary (`results/exp3.jsonl`)
 
 Minutes from the start of the measured window until the judge failed the canary, over the runs it caught. The fixed-horizon judges decide once, at 6 minutes. Median and 90th percentile.

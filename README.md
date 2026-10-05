@@ -14,7 +14,7 @@ production traffic or a production canary, and the judge's rules are Kayenta's, 
 | Question (live canaries on one mini PC unless noted) | Result |
 |---|---|
 | Injected regressions stopped within the 6-minute window (38 canaries: latency +2% to +50%, errors, memory leaks, CPU burn) | **sequential judge 82%** (93% without the +2% and +5% latency cases), Kayenta-style judge 74%, static limits with Flagger's defaults 18%, static limits tuned on healthy runs 29% |
-| False alarms on healthy canaries (baseline and canary the same build) | **{{AA_LINE}}** |
+| False alarms on healthy canaries (baseline and canary the same build) | **sequential judge 0 of 24**, Kayenta-style judge 0 of 24; the same Mann-Whitney test re-run every interval 4 of 24 (17%); static limits 1 to 3 of 24 |
 | Minutes to stop a bad canary | **median 1.3 min** for the sequential judge against 6 min for the fixed-length check |
 | Agreement with Kayenta on the same series (58 recorded runs, each judged at 3 window lengths) | **1,044 of 1,044** metric classifications and 174 of 174 canary verdicts, through CanaryJudge's Kayenta-compatible API |
 | Live rollouts, 1% to 5% to 25% of users, sequential judge (19 rollouts) | latency, error and CPU regressions rolled back after **at most 3.1% of users** saw them (median 2.8 min); a 4 KB-per-request leak caught once of twice (at 14.4%); a +10% latency regression **missed** in all 3 rollouts; all 4 healthy rollouts promoted |
@@ -95,6 +95,6 @@ way, with what found it: [`BUG_LOG.md`](BUG_LOG.md).
 
 The live canaries (exp1 to exp3) ran in WSL2 (2 vCPU, 6 GB) on a shared mini PC (AMD Ryzen 3 4300U, 16 GB). Midway,
 WSL on that box became unusable (it hung whenever it was under load, for this project and another one sharing
-it), so the rollouts (exp5), the trace replay and a second A/A set ran as native Windows processes on the same
-mini PC, and the full Kayenta comparison and the Argo demo ran on GitHub Actions runners. Every results row names
-its machine and records the host load.
+it), so the rollouts (exp5) and the trace replay ran as native Windows processes on the same mini PC (a second A/A
+set was attempted there and abandoned when other jobs saturated the host), and the full Kayenta comparison and
+the Argo demo ran on GitHub Actions runners. Every results row names its machine and records the host load.

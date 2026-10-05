@@ -16,7 +16,7 @@ release, compare it with the old one on live metrics, and roll back if it is wor
    Checking early and often is natural, and it quietly breaks the statistics.
 
 In short: on 38 live canaries with injected regressions, the sequential judge stopped 82% of them, in a median of
-1.3 minutes against the 6 minutes a fixed-length check waits, and raised {{AA_SHORT}} false alarms on healthy
+1.3 minutes against the 6 minutes a fixed-length check waits, and raised no false alarms on healthy
 canaries. The fixed-horizon judge, written from Kayenta's documentation, agrees with Kayenta itself on all 1,044
 metric classifications it was compared on. Static limits, the most common alternative, caught 18% to 29%.
 
@@ -103,7 +103,8 @@ worse than it should be.
 
 ![Regressions caught](exp1_detection.png)
 
-**False alarms.** {{AA_PARA}} Re-running the Mann-Whitney test every interval, on the same healthy runs, raised
+**False alarms.** Across 24 healthy canaries (18 in the main set, 6 under the replayed NASA traffic shape) the sequential judge
+raised no false alarm, and neither did the Kayenta-style judge. Re-running the Mann-Whitney test every interval, on the same healthy runs, raised
 3 false alarms in 18. The per-interval differences turned out to be close to independent for latency (lag-1
 autocorrelation between -0.03 and +0.04), which is why the sequential guarantee held on live data; for memory
 growth it was -0.41, which errs on the safe side.
