@@ -88,3 +88,20 @@ python3 bench/ledger.py > NUMBERS.md && python3 bench/charts.py
 `deploy/grafana` holds the dashboard (`docker compose -f deploy/docker-compose.yml -f deploy/grafana/compose.yml up -d`,
 then http://localhost:13000). `scripts/argo_demo.sh` builds a k3d cluster with Argo Rollouts and runs a healthy and a
 regressed rollout against the in-cluster CanaryJudge.
+
+## Without Docker (native processes)
+
+Everything except the Kayenta comparison and Argo runs as plain processes too, which is how the rollouts were run
+when Docker was unavailable. With a JDK 21 and Prometheus's binary in `build/` (Windows paths shown):
+
+```powershell
+.\gradlew.bat :target:bootJar :traffic:jar :server:bootJar :bench:installDist
+pwsh -File scripts\native_stack.ps1 up        # Prometheus :29090, splitter :28000, load generator :28001, server :28090
+bench\build\install\bench\bin\bench.bat rollout --plan configs/rollout-plan.json --lanes r1 --launcher process `
+  --ports (Get-Content deploy\windows\ports.txt) --prom http://127.0.0.1:29090 --server http://127.0.0.1:28090 `
+  --loadgen http://127.0.0.1:28001 --out results/exp5.jsonl
+pwsh -File scripts\native_stack.ps1 down
+```
+
+`scripts/native_stack.ps1 up -Trace configs/traces/nasa-jul95-per-minute.csv -TraceOffset 3420` replays the NASA
+request-rate shape; `scripts/dashboard_shot.ps1` renders the Grafana dashboard for a recorded rollout.
